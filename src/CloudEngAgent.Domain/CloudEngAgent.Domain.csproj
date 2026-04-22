@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>CloudEngAgent.Domain</RootNamespace>
+    <AssemblyName>CloudEngAgent.Domain</AssemblyName>
+  </PropertyGroup>
+</Project>

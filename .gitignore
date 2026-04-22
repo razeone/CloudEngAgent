@@ -33,3 +33,11 @@ secrets.json
 ## OS
 .DS_Store
 Thumbs.db
+
+## Claude Code local overrides (keep settings.json tracked, ignore local/personal)
+.claude/settings.local.json
+.claude/projects/
+.claude/shell-snapshots/
+.claude/todos/
+.claude/statsig/
+.claude/ide/

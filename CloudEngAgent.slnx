@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CloudEngAgent.Api/CloudEngAgent.Api.csproj" />
+    <Project Path="src/CloudEngAgent.Application/CloudEngAgent.Application.csproj" />
+    <Project Path="src/CloudEngAgent.Domain/CloudEngAgent.Domain.csproj" />
+    <Project Path="src/CloudEngAgent.Infrastructure/CloudEngAgent.Infrastructure.csproj" />
+    <Project Path="src/CloudEngAgent.Mcp.Server/CloudEngAgent.Mcp.Server.csproj" />
+  </Folder>
+</Solution>
