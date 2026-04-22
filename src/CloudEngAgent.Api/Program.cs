@@ -68,7 +68,7 @@ builder.Services.AddCors(options => options.AddPolicy("frontend", policy =>
     }
 }));
 
-builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
 builder.Services.AddSingleton<RunDispatcher>();
 builder.Services.AddCloudEngAuth(builder.Configuration, builder.Environment);
 
@@ -169,7 +169,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
-app.MapGet("/readyz", () => Results.Ok(new { status = "ready" })).AllowAnonymous();
+app.MapHealthChecks("/readyz").AllowAnonymous();
 
 app.MapV1();
 

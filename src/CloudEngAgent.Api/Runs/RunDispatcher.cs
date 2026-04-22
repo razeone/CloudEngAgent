@@ -206,10 +206,6 @@ public sealed class RunDispatcher(
     private async Task PublishErrorAsync(Guid runId, Exception ex)
     {
         var existing = await store.GetAsync(runId, CancellationToken.None).ConfigureAwait(false);
-        if (existing is { IsTerminal: false })
-        {
-            await store.UpdateAsync(existing.WithStatus(RunStatus.Failed, clock.UtcNow), CancellationToken.None).ConfigureAwait(false);
-        }
 
         var errorEvent = new RunEvent(
             RunId: runId,
@@ -217,7 +213,19 @@ public sealed class RunDispatcher(
             PayloadJson: JsonSerializer.Serialize(new { message = ex.Message, type = ex.GetType().FullName }),
             SequenceNo: long.MaxValue,
             OccurredAt: clock.UtcNow);
-        await store.AppendEventAsync(errorEvent, CancellationToken.None).ConfigureAwait(false);
+
+        if (existing is { IsTerminal: false })
+        {
+            await store.AppendEventAndUpdateAsync(
+                errorEvent,
+                existing.WithStatus(RunStatus.Failed, clock.UtcNow),
+                CancellationToken.None).ConfigureAwait(false);
+        }
+        else
+        {
+            await store.AppendEventAsync(errorEvent, CancellationToken.None).ConfigureAwait(false);
+        }
+
         await bus.PublishAsync(errorEvent, CancellationToken.None).ConfigureAwait(false);
     }
 

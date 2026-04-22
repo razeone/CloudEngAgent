@@ -60,6 +60,31 @@ public sealed class InMemoryRunStore : IRunStore
         return Task.CompletedTask;
     }
 
+    public Task AppendEventAndUpdateAsync(RunEvent evt, Run updated, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(evt);
+        ArgumentNullException.ThrowIfNull(updated);
+
+        // Single lock so the event append and run update are never observed
+        // independently, mirroring the EF Core transaction behaviour.
+        lock (_eventsLock)
+        {
+            var list = _events.GetOrAdd(evt.RunId, _ => new List<RunEvent>());
+            for (var i = 0; i < list.Count; i++)
+            {
+                if (list[i].SequenceNo == evt.SequenceNo)
+                {
+                    throw new InvalidOperationException(
+                        $"Duplicate SequenceNo {evt.SequenceNo} for run {evt.RunId}.");
+                }
+            }
+            list.Add(evt);
+            _runs[evt.RunId] = updated;
+        }
+
+        return Task.CompletedTask;
+    }
+
     public async IAsyncEnumerable<RunEvent> StreamEventsAsync(
         Guid runId,
         long fromSequence,

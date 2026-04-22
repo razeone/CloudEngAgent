@@ -153,7 +153,6 @@ public sealed class StartWorkflowRunHandler(
     private async Task<RunEvent> FinishAsync(Run run, RunStatus terminal, long sequence, string? reason, CancellationToken cancellationToken)
     {
         var finished = run.WithStatus(terminal, clock.UtcNow);
-        await runs.UpdateAsync(finished, cancellationToken).ConfigureAwait(false);
 
         var finishedEvent = new RunEvent(
             run.Id,
@@ -161,7 +160,8 @@ public sealed class StartWorkflowRunHandler(
             JsonSerializer.Serialize(new { status = terminal.ToString(), reason }),
             SequenceNo: sequence,
             OccurredAt: clock.UtcNow);
-        await runs.AppendEventAsync(finishedEvent, cancellationToken).ConfigureAwait(false);
+
+        await runs.AppendEventAndUpdateAsync(finishedEvent, finished, cancellationToken).ConfigureAwait(false);
         return finishedEvent;
     }
 

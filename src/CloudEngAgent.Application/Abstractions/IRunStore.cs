@@ -13,6 +13,14 @@ public interface IRunStore
 
     Task AppendEventAsync(RunEvent @event, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Atomically appends <paramref name="evt"/> and replaces the persisted
+    /// <see cref="Run"/> with <paramref name="updated"/> in a single commit.
+    /// Use for terminal transitions so the event and status change are never
+    /// observed independently.
+    /// </summary>
+    Task AppendEventAndUpdateAsync(RunEvent evt, Run updated, CancellationToken ct);
+
     IAsyncEnumerable<RunEvent> StreamEventsAsync(Guid runId, long fromSequence, CancellationToken cancellationToken);
 
     Task AppendMessageAsync(Message message, CancellationToken cancellationToken);

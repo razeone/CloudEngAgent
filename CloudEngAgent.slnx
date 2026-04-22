@@ -9,5 +9,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/CloudEngAgent.Api.Tests/CloudEngAgent.Api.Tests.csproj" />
     <Project Path="tests/CloudEngAgent.Domain.Tests/CloudEngAgent.Domain.Tests.csproj" />
+    <Project Path="tests/CloudEngAgent.Infrastructure.Tests/CloudEngAgent.Infrastructure.Tests.csproj" />
   </Folder>
 </Solution>

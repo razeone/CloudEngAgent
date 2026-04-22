@@ -37,6 +37,60 @@ GET /readyz
 
 OpenAPI docs are exposed at `/openapi/v1.json` in Development.
 
+If a `ConnectionStrings:Runs` connection string is configured, apply EF Core migrations first:
+
+```powershell
+dotnet ef database update --project src/CloudEngAgent.Infrastructure --startup-project src/CloudEngAgent.Api
+```
+
+## Database
+
+This project uses EF Core with SQL Server for run persistence. The database is optional in Development but required in production.
+
+### Prerequisites
+
+Install SQL Server locally or via Docker:
+
+```powershell
+docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=Your_strong_Passw0rd!" `
+  -p 1433:1433 -d --name cloudeng-mssql `
+  mcr.microsoft.com/mssql/server:2022-latest
+```
+
+### Set the connection string
+
+Configure `ConnectionStrings:Runs` via user-secrets (recommended for Development):
+
+```powershell
+dotnet user-secrets init --project src/CloudEngAgent.Api
+dotnet user-secrets set --project src/CloudEngAgent.Api `
+  "ConnectionStrings:Runs" `
+  "Server=localhost,1433;Database=cloudeng_runs;User Id=sa;Password=Your_strong_Passw0rd!;TrustServerCertificate=true"
+```
+
+Alternatively, set the `ConnectionStrings__Runs` environment variable.
+
+### Apply migrations
+
+Install the EF Core CLI tool if needed:
+
+```powershell
+dotnet tool install --global dotnet-ef
+```
+
+Apply pending migrations:
+
+```powershell
+dotnet ef database update --project src/CloudEngAgent.Infrastructure --startup-project src/CloudEngAgent.Api
+```
+
+### Fallback behavior
+
+- **Development**: If `ConnectionStrings:Runs` is empty, the API falls back to an in-memory store (data is lost on restart) and logs a warning.
+- **Production & other environments**: If `ConnectionStrings:Runs` is empty, the API fails fast at startup with an `InvalidOperationException`.
+
+The `/readyz` health probe returns **503 Service Unavailable** when the database is unreachable.
+
 ## API surface (v1)
 
 | Method | Route                                  | Description                                              |
@@ -84,19 +138,23 @@ This avoids leaking SSE streams to anonymous clients while keeping the EventSour
 
 ```jsonc
 {
-  "Cors":          { "AllowedOrigins": ["http://localhost:5173"] },
-  "Runs":          { "MaxConcurrent": 32, "EventBufferSize": 1024 },
-  "Sse":           { "TokenLifetimeSeconds": 120 },
-  "RateLimiting":  { "Enabled": true, "WritePermitsPerMinute": 60, "ReadPermitsPerMinute": 600 },
-  "OpenTelemetry": { "Enabled": false, "ServiceName": "CloudEngAgent.Api", "OtlpEndpoint": "" },
-  "Entra":         { "TenantId": "", "Audience": "api://cloud-eng-agent" },
-  "Backends":      { /* per-backend connection settings */ },
-  "Mcp":           { "Servers": [ /* MCP servers */ ] },
-  "Personas":      { "Path": "./personas" }
+  "Cors":            { "AllowedOrigins": ["http://localhost:5173"] },
+  "Runs":            { "MaxConcurrent": 32, "EventBufferSize": 1024 },
+  "Sse":             { "TokenLifetimeSeconds": 120 },
+  "RateLimiting":    { "Enabled": true, "WritePermitsPerMinute": 60, "ReadPermitsPerMinute": 600 },
+  "OpenTelemetry":   { "Enabled": false, "ServiceName": "CloudEngAgent.Api", "OtlpEndpoint": "" },
+  "Entra":           { "TenantId": "", "Audience": "api://cloud-eng-agent" },
+  "Backends":        { /* per-backend connection settings */ },
+  "Mcp":             { "Servers": [ /* MCP servers */ ] },
+  "Personas":        { "Path": "./personas" },
+  "ConnectionStrings": { "Runs": "" }
 }
 ```
 
-In non-Development environments the app fails fast at startup if `Cors:AllowedOrigins` is empty.
+Key notes:
+
+- **ConnectionStrings:Runs**: Set to a SQL Server connection string to enable EF Core persistence. If empty in Development, falls back to in-memory. Required in production.
+- In non-Development environments the app fails fast at startup if `Cors:AllowedOrigins` is empty.
 
 ## Container
 
@@ -109,4 +167,13 @@ The container runs as non-root and exposes a `HEALTHCHECK` against `/healthz`.
 
 ## Roadmap
 
-See the in-session plan for the full P0/P1/P2 backlog and milestones M2 (EF Core), M3 (real LLM backends), M4 (YAML personas + hot reload), M5 (real workflow engine on `Microsoft.Agents.AI.Workflows`), M6 (MCP SQL server), M7 (MCP client wiring). Forward-looking features (P3) include resumption, multi-tenancy, persona overlays, a workflow DSL, human-in-the-loop tool approval, cost/token telemetry, and saved investigations.
+See the in-session plan for the full P0/P1/P2 backlog. Milestones:
+
+- **M2 (EF Core)**: ✅ In progress — SQL Server persistence and migrations have landed; integration tests & handler atomicity are in this wave.
+- **M3** (real LLM backends)
+- **M4** (YAML personas + hot reload)
+- **M5** (real workflow engine on `Microsoft.Agents.AI.Workflows`)
+- **M6** (MCP SQL server)
+- **M7** (MCP client wiring)
+
+Forward-looking features (P3) include resumption, multi-tenancy, persona overlays, a workflow DSL, human-in-the-loop tool approval, cost/token telemetry, and saved investigations.
