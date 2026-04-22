@@ -6,4 +6,8 @@
     <Project Path="src/CloudEngAgent.Infrastructure/CloudEngAgent.Infrastructure.csproj" />
     <Project Path="src/CloudEngAgent.Mcp.Server/CloudEngAgent.Mcp.Server.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CloudEngAgent.Api.Tests/CloudEngAgent.Api.Tests.csproj" />
+    <Project Path="tests/CloudEngAgent.Domain.Tests/CloudEngAgent.Domain.Tests.csproj" />
+  </Folder>
 </Solution>

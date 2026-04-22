@@ -40,5 +40,9 @@
 
     <!-- YAML -->
     <PackageReference Include="YamlDotNet" />
+
+    <!-- DI + Config abstractions for AddInfrastructure -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
   </ItemGroup>
 </Project>

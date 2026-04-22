@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\CloudEngAgent.Application\CloudEngAgent.Application.csproj" />
     <ProjectReference Include="..\CloudEngAgent.Infrastructure\CloudEngAgent.Infrastructure.csproj" />
   </ItemGroup>
 
