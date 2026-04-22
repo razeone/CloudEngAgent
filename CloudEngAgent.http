@@ -1,0 +1,6 @@
+@CloudEngAgent_HostAddress = http://localhost:5109
+
+GET {{CloudEngAgent_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

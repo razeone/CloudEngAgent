@@ -1,0 +1,35 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## Rider / VS
+.vs/
+.idea/
+*.swp
+
+## Environment / secrets
+*.env
+*.env.local
+appsettings.*.Local.json
+secrets.json
+
+## OS
+.DS_Store
+Thumbs.db
