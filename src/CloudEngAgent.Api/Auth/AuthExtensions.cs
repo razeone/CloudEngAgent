@@ -26,10 +26,13 @@ internal static class AuthExtensions
         }
         else
         {
-            if (!environment.IsDevelopment())
+            // Strict whitelist: only the literal "Development" environment may
+            // run without Entra. Anything else (Staging, Production, custom) refuses to start.
+            if (!string.Equals(environment.EnvironmentName, Environments.Development, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
-                    "Entra:TenantId is not configured. Refusing to start outside of Development without authentication.");
+                    $"Entra:TenantId is not configured and environment is '{environment.EnvironmentName}'. " +
+                    "Refusing to start outside of Development without authentication.");
             }
 
             services

@@ -32,6 +32,8 @@ public sealed record StartRunRequest(string WorkflowId, string UserInput, string
 
 public sealed record StartRunResponse(Guid RunId, string Status, string EventsUrl);
 
+public sealed record SseTokenResponse(string Token, string EventsUrl, int ExpiresInSeconds, DateTimeOffset ExpiresAt);
+
 public sealed record MessageDto(
     Guid Id,
     Guid RunId,

@@ -43,25 +43,55 @@ public sealed class StartWorkflowRunHandler(
 
         long seq = 1;
         var terminalStatus = RunStatus.Succeeded;
+        string? terminalReason = null;
 
-        IAsyncEnumerable<RunEvent> stream;
+        IAsyncEnumerable<RunEvent>? stream = null;
+        Exception? engineStartFailure = null;
         try
         {
             stream = engine.ExecuteAsync(workflow, input, runId, cancellationToken);
         }
-        catch (OperationCanceledException)
+        catch (Exception ex)
         {
-            terminalStatus = RunStatus.Cancelled;
-            await FinishAsync(run, terminalStatus, seq, reason: null, cancellationToken).ConfigureAwait(false);
-            throw;
+            engineStartFailure = ex;
         }
 
-        await using var enumerator = stream.GetAsyncEnumerator(cancellationToken);
+        if (engineStartFailure is not null)
+        {
+            // engine.ExecuteAsync threw synchronously (before returning the iterator).
+            // We must still yield a terminal event so the dispatcher can publish it
+            // to the bus and the SSE client sees a clean end of stream.
+            if (engineStartFailure is OperationCanceledException)
+            {
+                terminalStatus = RunStatus.Cancelled;
+                terminalReason = "cancelled";
+            }
+            else
+            {
+                terminalStatus = RunStatus.Failed;
+                terminalReason = engineStartFailure.Message;
+                var errorEvent = new RunEvent(
+                    runId,
+                    RunEventType.Error,
+                    JsonSerializer.Serialize(new { message = engineStartFailure.Message, type = engineStartFailure.GetType().FullName }),
+                    SequenceNo: seq++,
+                    OccurredAt: clock.UtcNow);
+                await runs.AppendEventAsync(errorEvent, CancellationToken.None).ConfigureAwait(false);
+                yield return errorEvent;
+            }
+
+            var terminalEvent = await FinishAsync(run, terminalStatus, seq, terminalReason, CancellationToken.None).ConfigureAwait(false);
+            yield return terminalEvent;
+            yield break;
+        }
+
+        await using var enumerator = stream!.GetAsyncEnumerator(cancellationToken);
         while (true)
         {
             RunEvent? next = null;
             Exception? failure = null;
             var done = false;
+            var cancelled = false;
 
             try
             {
@@ -76,13 +106,19 @@ public sealed class StartWorkflowRunHandler(
             }
             catch (OperationCanceledException)
             {
-                terminalStatus = RunStatus.Cancelled;
-                await FinishAsync(run, terminalStatus, seq, reason: "cancelled", CancellationToken.None).ConfigureAwait(false);
-                throw;
+                cancelled = true;
             }
             catch (Exception ex)
             {
                 failure = ex;
+            }
+
+            if (cancelled)
+            {
+                terminalStatus = RunStatus.Cancelled;
+                var terminalEvent = await FinishAsync(run, terminalStatus, seq, "cancelled", CancellationToken.None).ConfigureAwait(false);
+                yield return terminalEvent;
+                yield break;
             }
 
             if (failure is not null)
@@ -96,7 +132,8 @@ public sealed class StartWorkflowRunHandler(
                     OccurredAt: clock.UtcNow);
                 await runs.AppendEventAsync(errorEvent, CancellationToken.None).ConfigureAwait(false);
                 yield return errorEvent;
-                await FinishAsync(run, terminalStatus, seq, failure.Message, CancellationToken.None).ConfigureAwait(false);
+                var terminalEvent = await FinishAsync(run, terminalStatus, seq, failure.Message, CancellationToken.None).ConfigureAwait(false);
+                yield return terminalEvent;
                 yield break;
             }
 
@@ -109,10 +146,11 @@ public sealed class StartWorkflowRunHandler(
             yield return next!;
         }
 
-        await FinishAsync(run, terminalStatus, seq, reason: null, cancellationToken).ConfigureAwait(false);
+        var finishedEvent = await FinishAsync(run, terminalStatus, seq, reason: null, cancellationToken).ConfigureAwait(false);
+        yield return finishedEvent;
     }
 
-    private async Task FinishAsync(Run run, RunStatus terminal, long sequence, string? reason, CancellationToken cancellationToken)
+    private async Task<RunEvent> FinishAsync(Run run, RunStatus terminal, long sequence, string? reason, CancellationToken cancellationToken)
     {
         var finished = run.WithStatus(terminal, clock.UtcNow);
         await runs.UpdateAsync(finished, cancellationToken).ConfigureAwait(false);
@@ -124,6 +162,7 @@ public sealed class StartWorkflowRunHandler(
             SequenceNo: sequence,
             OccurredAt: clock.UtcNow);
         await runs.AppendEventAsync(finishedEvent, cancellationToken).ConfigureAwait(false);
+        return finishedEvent;
     }
 
     private static string? Truncate(string? value, int max)

@@ -108,7 +108,12 @@ public class V1EndpointsTests : IClassFixture<ApiFactory>
         var start = await client.PostAsJsonAsync("/v1/runs", new StartRunRequest("dba-default", "Hello"));
         var startResp = await start.Content.ReadFromJsonAsync<StartRunResponse>();
 
-        using var req = new HttpRequestMessage(HttpMethod.Get, $"/v1/runs/{startResp!.RunId}/events");
+        var tokenResp = await client.PostAsync($"/v1/runs/{startResp!.RunId}/sse-token", content: null);
+        tokenResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var token = await tokenResp.Content.ReadFromJsonAsync<SseTokenResponse>();
+        token.Should().NotBeNull();
+
+        using var req = new HttpRequestMessage(HttpMethod.Get, token!.EventsUrl);
         req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
@@ -143,7 +148,10 @@ public class V1EndpointsTests : IClassFixture<ApiFactory>
             await Task.Delay(50);
         }
 
-        using var req = new HttpRequestMessage(HttpMethod.Get, $"/v1/runs/{startResp!.RunId}/events");
+        var tokenResp = await client.PostAsync($"/v1/runs/{startResp!.RunId}/sse-token", content: null);
+        var token = await tokenResp.Content.ReadFromJsonAsync<SseTokenResponse>();
+
+        using var req = new HttpRequestMessage(HttpMethod.Get, token!.EventsUrl);
         req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
         req.Headers.TryAddWithoutValidation("Last-Event-ID", "0");
 
@@ -157,6 +165,45 @@ public class V1EndpointsTests : IClassFixture<ApiFactory>
         // resume *after* it — the first event we see must not be RunStarted.
         events.Should().NotBeEmpty();
         events.First().evt.Should().NotBe("RunStarted");
+    }
+
+    [Fact]
+    public async Task SseStream_without_token_returns_401()
+    {
+        using var client = _factory.CreateClient();
+
+        var start = await client.PostAsJsonAsync("/v1/runs", new StartRunRequest("dba-default", "Hello"));
+        var startResp = await start.Content.ReadFromJsonAsync<StartRunResponse>();
+
+        using var resp = await client.GetAsync($"/v1/runs/{startResp!.RunId}/events");
+        resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task SseStream_with_token_for_other_run_returns_401()
+    {
+        using var client = _factory.CreateClient();
+
+        var startA = await client.PostAsJsonAsync("/v1/runs", new StartRunRequest("dba-default", "A"));
+        var startB = await client.PostAsJsonAsync("/v1/runs", new StartRunRequest("dba-default", "B"));
+        var a = await startA.Content.ReadFromJsonAsync<StartRunResponse>();
+        var b = await startB.Content.ReadFromJsonAsync<StartRunResponse>();
+
+        // Issue a token for run A but try to use it on run B.
+        var tokenResp = await client.PostAsync($"/v1/runs/{a!.RunId}/sse-token", content: null);
+        var token = await tokenResp.Content.ReadFromJsonAsync<SseTokenResponse>();
+
+        using var resp = await client.GetAsync($"/v1/runs/{b!.RunId}/events?token={Uri.EscapeDataString(token!.Token)}");
+        resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task SseToken_for_unknown_run_returns_404()
+    {
+        using var client = _factory.CreateClient();
+
+        var resp = await client.PostAsync($"/v1/runs/{Guid.NewGuid()}/sse-token", content: null);
+        resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]

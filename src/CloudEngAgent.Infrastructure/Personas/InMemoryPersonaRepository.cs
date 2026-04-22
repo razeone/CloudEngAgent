@@ -1,6 +1,5 @@
 using System.Runtime.CompilerServices;
 using CloudEngAgent.Application.Abstractions;
-using CloudEngAgent.Application.Personas;
 using CloudEngAgent.Domain.Backends;
 using CloudEngAgent.Domain.Personas;
 using CloudEngAgent.Domain.Tools;
@@ -20,10 +19,6 @@ public sealed class InMemoryPersonaRepository : IPersonaRepository
     {
         _personas = SeedPersonas().ToDictionary(p => p.Id, StringComparer.Ordinal);
     }
-
-#pragma warning disable CS0067 // Event raised when YAML hot-reload lands.
-    public event EventHandler<PersonaChangedEventArgs>? PersonaChanged;
-#pragma warning restore CS0067
 
     public Task<AgentPersona?> GetAsync(string id, CancellationToken cancellationToken)
     {

@@ -44,5 +44,8 @@
     <!-- DI + Config abstractions for AddInfrastructure -->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+
+    <!-- Data Protection for SSE token signing -->
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection" />
   </ItemGroup>
 </Project>

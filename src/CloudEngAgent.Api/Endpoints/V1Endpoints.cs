@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace CloudEngAgent.Api.Endpoints;
 
@@ -116,12 +117,38 @@ internal static class V1Endpoints
         group.MapPost("/{runId:guid}/cancel", (Guid runId, RunDispatcher dispatcher) =>
             dispatcher.TryCancel(runId) ? Results.Accepted() : Results.NotFound());
 
-        group.MapGet("/{runId:guid}/events",
-            [AllowAnonymous] async (Guid runId, HttpContext ctx, IRunStore store, IRunEventBus bus) =>
+        group.MapPost("/{runId:guid}/sse-token", async (Guid runId, HttpContext ctx, IRunStore store, ISseTokenService tokens, CancellationToken ct) =>
+        {
+            var run = await store.GetAsync(runId, ct).ConfigureAwait(false);
+            if (run is null)
             {
-                // SSE clients (EventSource) cannot send Authorization headers; auth is enforced via a
-                // short-lived token query param, applied at a higher layer in a follow-up plan.
-                await AgUiSseWriter.WriteAsync(ctx, runId, store, bus, ctx.RequestAborted).ConfigureAwait(false);
+                return Results.NotFound();
+            }
+
+            var subject = ctx.User?.Identity?.Name ?? "anonymous";
+            var issued = tokens.Issue(runId, subject);
+            var url = $"/v1/runs/{runId}/events?token={Uri.EscapeDataString(issued.Token)}";
+            return Results.Ok(new SseTokenResponse(
+                Token: issued.Token,
+                EventsUrl: url,
+                ExpiresInSeconds: (int)tokens.TokenLifetime.TotalSeconds,
+                ExpiresAt: issued.ExpiresAt));
+        });
+
+        group.MapGet("/{runId:guid}/events",
+            [AllowAnonymous] async (Guid runId, HttpContext ctx, IRunStore store, IRunEventBus bus, ISseTokenService tokens, ILoggerFactory loggerFactory) =>
+            {
+                // EventSource clients cannot send Authorization headers; auth is enforced
+                // via a short-lived data-protection-signed token issued by POST /sse-token.
+                var token = ctx.Request.Query["token"].ToString();
+                if (!tokens.TryValidate(token, runId, out _))
+                {
+                    return Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Missing or invalid SSE token");
+                }
+
+                var logger = loggerFactory.CreateLogger("CloudEngAgent.Api.Sse");
+                await AgUiSseWriter.WriteAsync(ctx, runId, store, bus, logger, ctx.RequestAborted).ConfigureAwait(false);
+                return Results.Empty;
             });
     }
 }

@@ -3,9 +3,11 @@ using CloudEngAgent.Application.Runs;
 using CloudEngAgent.Infrastructure.Backends;
 using CloudEngAgent.Infrastructure.Personas;
 using CloudEngAgent.Infrastructure.Runs;
+using CloudEngAgent.Infrastructure.Sse;
 using CloudEngAgent.Infrastructure.Workflows;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace CloudEngAgent.Infrastructure;
 
@@ -37,6 +39,17 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<IChatClientFactory, NotImplementedChatClientFactory>();
         services.AddSingleton<IMcpToolRegistry, EmptyMcpToolRegistry>();
+
+        // Data Protection is required by the SSE token service. Calling AddDataProtection
+        // is idempotent (TryAdd semantics inside) and gives us key rotation + ciphertext.
+        services.AddDataProtection();
+
+        var lifetimeSeconds = configuration.GetValue<int?>("Sse:TokenLifetimeSeconds") ?? 120;
+        services.TryAddSingleton<ISseTokenService>(sp =>
+            new DataProtectionSseTokenService(
+                sp.GetRequiredService<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>(),
+                sp.GetRequiredService<IClock>(),
+                TimeSpan.FromSeconds(Math.Clamp(lifetimeSeconds, 30, 600))));
 
         services.AddScoped<StartWorkflowRunHandler>();
 

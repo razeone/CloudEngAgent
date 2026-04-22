@@ -67,8 +67,27 @@ public sealed class RunDispatcher(
         var first = enumerator.Current;
         var runId = first.RunId;
         _ctsByRun[runId] = cts;
-        await bus.PublishAsync(first, CancellationToken.None).ConfigureAwait(false);
 
+        try
+        {
+            await bus.PublishAsync(first, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            // Publishing the first event failed. Tear down the run and surface the error.
+            logger.LogError(ex, "Failed to publish initial RunStarted event for run {RunId}", runId);
+            _ctsByRun.TryRemove(runId, out _);
+            try { await enumerator.DisposeAsync().ConfigureAwait(false); } catch { /* observed */ }
+            try { await scope.DisposeAsync().ConfigureAwait(false); } catch { /* observed */ }
+            try { bus.Complete(runId); } catch { /* observed */ }
+            cts.Dispose();
+            throw;
+        }
+
+        // Ordering: Task.Run is fire-and-forget. The first MoveNextAsync above has
+        // *fully completed* (we awaited it) before we schedule DrainAsync, so the
+        // enumerator's state machine is quiescent by the time DrainAsync's first
+        // MoveNextAsync runs. There is no concurrent access to the enumerator.
         _ = Task.Run(() => DrainAsync(runId, scope, enumerator, cts), CancellationToken.None);
 
         return runId;
@@ -95,25 +114,57 @@ public sealed class RunDispatcher(
         {
             while (await enumerator.MoveNextAsync().ConfigureAwait(false))
             {
-                await bus.PublishAsync(enumerator.Current, CancellationToken.None).ConfigureAwait(false);
+                try
+                {
+                    await bus.PublishAsync(enumerator.Current, CancellationToken.None).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    // Bus publish failed; log and stop draining. The finally block will still
+                    // complete the channel so subscribers don't hang.
+                    logger.LogError(ex, "Failed to publish event {SequenceNo} for run {RunId}", enumerator.Current.SequenceNo, runId);
+                    break;
+                }
             }
         }
         catch (OperationCanceledException)
         {
-            await PublishCancellationAsync(runId).ConfigureAwait(false);
+            await SafeAsync(() => PublishCancellationAsync(runId), runId, "cancellation").ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Run {RunId} dispatcher loop crashed", runId);
-            await PublishErrorAsync(runId, ex).ConfigureAwait(false);
+            await SafeAsync(() => PublishErrorAsync(runId, ex), runId, "error").ConfigureAwait(false);
         }
         finally
         {
+            // Each cleanup step is isolated: a failure in one must not prevent the others
+            // from running. bus.Complete in particular MUST run or SSE clients hang forever.
             _ctsByRun.TryRemove(runId, out _);
-            cts.Dispose();
-            bus.Complete(runId);
-            await enumerator.DisposeAsync().ConfigureAwait(false);
-            await scope.DisposeAsync().ConfigureAwait(false);
+
+            try { cts.Dispose(); }
+            catch (Exception ex) { logger.LogWarning(ex, "Disposing CTS for run {RunId} threw", runId); }
+
+            try { bus.Complete(runId); }
+            catch (Exception ex) { logger.LogWarning(ex, "Completing bus for run {RunId} threw", runId); }
+
+            try { await enumerator.DisposeAsync().ConfigureAwait(false); }
+            catch (Exception ex) { logger.LogWarning(ex, "Disposing enumerator for run {RunId} threw", runId); }
+
+            try { await scope.DisposeAsync().ConfigureAwait(false); }
+            catch (Exception ex) { logger.LogWarning(ex, "Disposing scope for run {RunId} threw", runId); }
+        }
+    }
+
+    private async Task SafeAsync(Func<Task> action, Guid runId, string label)
+    {
+        try
+        {
+            await action().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to publish {Label} terminal event for run {RunId}", label, runId);
         }
     }
 
