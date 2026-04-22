@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using CloudEngAgent.Api.Observability;
 using CloudEngAgent.Application.Abstractions;
 using CloudEngAgent.Domain.Runs;
 using Microsoft.AspNetCore.Http;
@@ -40,6 +41,29 @@ internal static class AgUiSseWriter
         var seenSequences = new HashSet<long>();
         var threadId = context.Request.Query.TryGetValue("threadId", out var tid) ? tid.ToString() : null;
 
+        Telemetry.SseClientsActive.Add(1);
+        try
+        {
+            await StreamAsync(context, runId, store, bus, logger, fromSequence, seenSequences, threadId, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            Telemetry.SseClientsActive.Add(-1);
+        }
+    }
+
+    private static async Task StreamAsync(
+        HttpContext context,
+        Guid runId,
+        IRunStore store,
+        IRunEventBus bus,
+        ILogger? logger,
+        long fromSequence,
+        HashSet<long> seenSequences,
+        string? threadId,
+        CancellationToken cancellationToken)
+    {
         // Subscribe before replay so live events queued during replay are not lost.
         var liveStream = bus.SubscribeAsync(runId, cancellationToken);
         var liveEnumerator = liveStream.GetAsyncEnumerator(cancellationToken);

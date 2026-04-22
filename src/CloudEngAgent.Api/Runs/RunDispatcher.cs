@@ -1,10 +1,15 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text.Json;
+using System.Threading;
+using CloudEngAgent.Api.Configuration;
 using CloudEngAgent.Api.Contracts;
+using CloudEngAgent.Api.Observability;
 using CloudEngAgent.Application.Abstractions;
 using CloudEngAgent.Application.Runs;
 using CloudEngAgent.Domain.Runs;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace CloudEngAgent.Api.Runs;
 
@@ -20,13 +25,23 @@ public sealed class RunDispatcher(
     IRunEventBus bus,
     IRunStore store,
     IClock clock,
+    IOptionsMonitor<RunsOptions> runsOptions,
     ILogger<RunDispatcher> logger)
 {
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _ctsByRun = new();
+    private int _activeCount;
 
     public async Task<Guid> StartAsync(StartRunRequest input, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(input);
+
+        var max = runsOptions.CurrentValue.MaxConcurrent;
+        if (Interlocked.Increment(ref _activeCount) > max)
+        {
+            Interlocked.Decrement(ref _activeCount);
+            throw new InvalidOperationException(
+                $"Maximum run concurrency ({max}) reached. Try again later.");
+        }
 
         var startInput = new StartWorkflowRunInput(
             WorkflowId: input.WorkflowId,
@@ -50,6 +65,7 @@ public sealed class RunDispatcher(
         }
         catch
         {
+            Interlocked.Decrement(ref _activeCount);
             await enumerator.DisposeAsync().ConfigureAwait(false);
             await scope.DisposeAsync().ConfigureAwait(false);
             cts.Dispose();
@@ -58,6 +74,7 @@ public sealed class RunDispatcher(
 
         if (!advanced)
         {
+            Interlocked.Decrement(ref _activeCount);
             await enumerator.DisposeAsync().ConfigureAwait(false);
             await scope.DisposeAsync().ConfigureAwait(false);
             cts.Dispose();
@@ -71,18 +88,21 @@ public sealed class RunDispatcher(
         try
         {
             await bus.PublishAsync(first, CancellationToken.None).ConfigureAwait(false);
+            Telemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("type", first.Type.ToString()));
         }
         catch (Exception ex)
         {
-            // Publishing the first event failed. Tear down the run and surface the error.
             logger.LogError(ex, "Failed to publish initial RunStarted event for run {RunId}", runId);
             _ctsByRun.TryRemove(runId, out _);
+            Interlocked.Decrement(ref _activeCount);
             try { await enumerator.DisposeAsync().ConfigureAwait(false); } catch { /* observed */ }
             try { await scope.DisposeAsync().ConfigureAwait(false); } catch { /* observed */ }
             try { bus.Complete(runId); } catch { /* observed */ }
             cts.Dispose();
             throw;
         }
+
+        Telemetry.RunsStarted.Add(1, new KeyValuePair<string, object?>("workflow", input.WorkflowId));
 
         // Ordering: Task.Run is fire-and-forget. The first MoveNextAsync above has
         // *fully completed* (we awaited it) before we schedule DrainAsync, so the
@@ -110,18 +130,30 @@ public sealed class RunDispatcher(
         IAsyncEnumerator<RunEvent> enumerator,
         CancellationTokenSource cts)
     {
+        using var activity = Telemetry.ActivitySource.StartActivity("run.drain", ActivityKind.Internal);
+        activity?.SetTag("run.id", runId);
+
+        var terminalStatus = "Unknown";
         try
         {
             while (await enumerator.MoveNextAsync().ConfigureAwait(false))
             {
                 try
                 {
-                    await bus.PublishAsync(enumerator.Current, CancellationToken.None).ConfigureAwait(false);
+                    var evt = enumerator.Current;
+                    await bus.PublishAsync(evt, CancellationToken.None).ConfigureAwait(false);
+                    Telemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("type", evt.Type.ToString()));
+                    if (evt.Type == RunEventType.RunFinished)
+                    {
+                        terminalStatus = "Succeeded";
+                    }
+                    else if (evt.Type == RunEventType.Error)
+                    {
+                        terminalStatus = "Failed";
+                    }
                 }
                 catch (Exception ex)
                 {
-                    // Bus publish failed; log and stop draining. The finally block will still
-                    // complete the channel so subscribers don't hang.
                     logger.LogError(ex, "Failed to publish event {SequenceNo} for run {RunId}", enumerator.Current.SequenceNo, runId);
                     break;
                 }
@@ -129,17 +161,20 @@ public sealed class RunDispatcher(
         }
         catch (OperationCanceledException)
         {
+            terminalStatus = "Cancelled";
             await SafeAsync(() => PublishCancellationAsync(runId), runId, "cancellation").ConfigureAwait(false);
         }
         catch (Exception ex)
         {
+            terminalStatus = "Failed";
             logger.LogError(ex, "Run {RunId} dispatcher loop crashed", runId);
             await SafeAsync(() => PublishErrorAsync(runId, ex), runId, "error").ConfigureAwait(false);
         }
         finally
         {
-            // Each cleanup step is isolated: a failure in one must not prevent the others
-            // from running. bus.Complete in particular MUST run or SSE clients hang forever.
+            Telemetry.RunsFinished.Add(1, new KeyValuePair<string, object?>("status", terminalStatus));
+            Interlocked.Decrement(ref _activeCount);
+
             _ctsByRun.TryRemove(runId, out _);
 
             try { cts.Dispose(); }

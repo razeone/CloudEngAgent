@@ -28,7 +28,7 @@ internal static class V1Endpoints
 
     private static void MapWorkflows(RouteGroupBuilder v1)
     {
-        var group = v1.MapGroup("/workflows").WithTags("workflows");
+        var group = v1.MapGroup("/workflows").WithTags("workflows").RequireRateLimiting("read");
 
         group.MapGet("/", (IWorkflowRegistry registry) =>
             Results.Ok(registry.List().Select(WorkflowDto.FromDomain).ToArray()));
@@ -42,7 +42,7 @@ internal static class V1Endpoints
 
     private static void MapPersonas(RouteGroupBuilder v1)
     {
-        var group = v1.MapGroup("/personas").WithTags("personas");
+        var group = v1.MapGroup("/personas").WithTags("personas").RequireRateLimiting("read");
 
         group.MapGet("/", async (IPersonaRepository repo, CancellationToken ct) =>
         {
@@ -83,7 +83,11 @@ internal static class V1Endpoints
             {
                 return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: ex.Message);
             }
-        });
+            catch (InvalidOperationException ex) when (ex.Message.Contains("concurrency", StringComparison.OrdinalIgnoreCase))
+            {
+                return Results.Problem(statusCode: StatusCodes.Status429TooManyRequests, title: ex.Message);
+            }
+        }).RequireRateLimiting("write");
 
         group.MapGet("/", async (string? workflowId, RunStatus? status, int? take, int? skip, IRunStore store, CancellationToken ct) =>
         {
@@ -115,7 +119,8 @@ internal static class V1Endpoints
         });
 
         group.MapPost("/{runId:guid}/cancel", (Guid runId, RunDispatcher dispatcher) =>
-            dispatcher.TryCancel(runId) ? Results.Accepted() : Results.NotFound());
+            dispatcher.TryCancel(runId) ? Results.Accepted() : Results.NotFound())
+            .RequireRateLimiting("write");
 
         group.MapPost("/{runId:guid}/sse-token", async (Guid runId, HttpContext ctx, IRunStore store, ISseTokenService tokens, CancellationToken ct) =>
         {
@@ -133,7 +138,7 @@ internal static class V1Endpoints
                 EventsUrl: url,
                 ExpiresInSeconds: (int)tokens.TokenLifetime.TotalSeconds,
                 ExpiresAt: issued.ExpiresAt));
-        });
+        }).RequireRateLimiting("write");
 
         group.MapGet("/{runId:guid}/events",
             [AllowAnonymous] async (Guid runId, HttpContext ctx, IRunStore store, IRunEventBus bus, ISseTokenService tokens, ILoggerFactory loggerFactory) =>

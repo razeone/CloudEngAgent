@@ -42,9 +42,18 @@ public sealed class InMemoryRunStore : IRunStore
     public Task AppendEventAsync(RunEvent @event, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(@event);
-        var list = _events.GetOrAdd(@event.RunId, _ => new List<RunEvent>());
         lock (_eventsLock)
         {
+            var list = _events.GetOrAdd(@event.RunId, _ => new List<RunEvent>());
+            // Mirror the EF Core unique-index constraint we'll enforce in M2.
+            for (var i = 0; i < list.Count; i++)
+            {
+                if (list[i].SequenceNo == @event.SequenceNo)
+                {
+                    throw new InvalidOperationException(
+                        $"Duplicate SequenceNo {@event.SequenceNo} for run {@event.RunId}.");
+                }
+            }
             list.Add(@event);
         }
 
@@ -64,7 +73,10 @@ public sealed class InMemoryRunStore : IRunStore
         RunEvent[] snapshot;
         lock (_eventsLock)
         {
-            snapshot = list.Where(e => e.SequenceNo >= fromSequence).ToArray();
+            snapshot = list
+                .Where(e => e.SequenceNo >= fromSequence)
+                .OrderBy(e => e.SequenceNo)
+                .ToArray();
         }
 
         foreach (var evt in snapshot)
