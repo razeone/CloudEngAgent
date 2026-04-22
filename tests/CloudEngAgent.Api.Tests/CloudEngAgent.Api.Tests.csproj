@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\CloudEngAgent.Api\CloudEngAgent.Api.csproj" />
+    <ProjectReference Include="..\..\src\CloudEngAgent.Infrastructure\CloudEngAgent.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -14,5 +15,6 @@
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="NSubstitute" />
   </ItemGroup>
 </Project>

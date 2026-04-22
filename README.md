@@ -91,6 +91,109 @@ dotnet ef database update --project src/CloudEngAgent.Infrastructure --startup-p
 
 The `/readyz` health probe returns **503 Service Unavailable** when the database is unreachable.
 
+## LLM backends
+
+CloudEngAgent routes agent calls to multiple LLM providers via an `IChatClientFactory`. Each agent persona declares its preferred backend, which is resolved from the `Backends` configuration section.
+
+### Supported backends
+
+| Backend | Status | Details |
+|---------|--------|---------|
+| `azure-openai` | ✅ Implemented | Azure OpenAI Service |
+| `openai` | ✅ Implemented | OpenAI API (gpt-4o, gpt-4-turbo, etc.) |
+| `github-models` | ✅ Implemented | GitHub Models (Azure-hosted inference) |
+| `anthropic` | ✅ Implemented | Anthropic API (Claude models via `Anthropic.SDK`) |
+| `azure-foundry` | 🔜 M3.5 | Azure AI Foundry (deferred) |
+
+### Per-backend configuration
+
+Each backend is configured under `Backends:<id>` in `appsettings.json`. Example (all backends):
+
+```jsonc
+"Backends": {
+  "azure-openai": {
+    "Endpoint": "https://my-aoai.openai.azure.com/",
+    "Deployment": "gpt-4o",
+    "AuthMode": "ManagedIdentity"                    // or "ApiKey" (requires ApiKeyRef)
+  },
+  "openai": {
+    "Model": "gpt-4o",
+    "ApiKeyRef": "openai-key",                        // resolved from secrets (see below)
+    "AuthMode": "ApiKey"
+  },
+  "github-models": {
+    "Model": "gpt-4o",
+    "ApiKeyRef": "github-pat",                        // GitHub Personal Access Token (PAT)
+    "AuthMode": "ApiKey"
+  },
+  "anthropic": {
+    "Model": "claude-opus-4-7",
+    "ApiKeyRef": "anthropic-key",
+    "AuthMode": "ApiKey"
+  },
+  "azure-foundry": {
+    "Endpoint": "https://my-foundry-endpoint/",
+    "Model": "some-model-id",
+    "ApiKeyRef": "foundry-key",
+    "AuthMode": "ApiKey"
+  }
+}
+```
+
+### Authentication modes
+
+- **ManagedIdentity** (Azure backends only): Uses `DefaultAzureCredential` (Entra ID managed identity in production, `az login` credentials locally).
+- **ApiKey**: Requires `ApiKeyRef` pointing to a secret that is resolved as described below.
+
+### Secret resolution order
+
+When a backend specifies `AuthMode: "ApiKey"` with an `ApiKeyRef` (e.g., `"openai-key"`), the secret is resolved in this order:
+
+1. **Azure Key Vault** (if `KeyVault:Uri` is configured): The secret name is retrieved from the vault with process-lifetime caching.
+2. **Configuration** (fallback): `IConfiguration["Secrets:<ApiKeyRef>"]` — check `appsettings.json` or user-secrets.
+3. **Environment variable** (final fallback): Kebab-case is converted to UPPER_SNAKE_CASE (e.g., `openai-key` → `OPENAI_KEY`).
+
+If none of these sources provide a value, startup fails with `InvalidOperationException`.
+
+### Local development: user-secrets
+
+For Development, store secrets in the user-secrets store (stored encrypted locally; not in the repo):
+
+```powershell
+dotnet user-secrets init --project src/CloudEngAgent.Api
+
+# Set OpenAI API key
+dotnet user-secrets set --project src/CloudEngAgent.Api "Secrets:openai-key" "sk-..."
+
+# Set GitHub PAT for GitHub Models
+dotnet user-secrets set --project src/CloudEngAgent.Api "Secrets:github-pat" "ghp_..."
+
+# Set Anthropic key
+dotnet user-secrets set --project src/CloudEngAgent.Api "Secrets:anthropic-key" "sk-ant-..."
+```
+
+Then run the API:
+
+```powershell
+dotnet run --project src/CloudEngAgent.Api
+```
+
+### Persona → backend mapping
+
+Each `AgentPersona` has a `BackendId` field that selects the backend configuration:
+
+```csharp
+public class AgentPersona
+{
+    public string Name { get; set; }
+    public BackendId Backend { get; set; }  // e.g., "azure-openai", "openai", "github-models"
+    public string Role { get; set; }
+    // ...
+}
+```
+
+When the workflow engine invokes an agent, it uses the persona's `Backend` to look up the configuration and instantiate the appropriate `IChatClient`.
+
 ## API surface (v1)
 
 | Method | Route                                  | Description                                              |
@@ -144,7 +247,9 @@ This avoids leaking SSE streams to anonymous clients while keeping the EventSour
   "RateLimiting":    { "Enabled": true, "WritePermitsPerMinute": 60, "ReadPermitsPerMinute": 600 },
   "OpenTelemetry":   { "Enabled": false, "ServiceName": "CloudEngAgent.Api", "OtlpEndpoint": "" },
   "Entra":           { "TenantId": "", "Audience": "api://cloud-eng-agent" },
+  "KeyVault":        { "Uri": "" },                   // Optional: Azure Key Vault for secret resolution
   "Backends":        { /* per-backend connection settings */ },
+  "Secrets":         { /* in-memory fallback secrets (development only) */ },
   "Mcp":             { "Servers": [ /* MCP servers */ ] },
   "Personas":        { "Path": "./personas" },
   "ConnectionStrings": { "Runs": "" }
@@ -153,6 +258,8 @@ This avoids leaking SSE streams to anonymous clients while keeping the EventSour
 
 Key notes:
 
+- **Backends**: See the "LLM backends" section above for per-backend configuration and secret resolution.
+- **KeyVault:Uri**: If set, API keys referenced in `Backends` are resolved from the vault. If empty, falls back to `Secrets` config or environment variables.
 - **ConnectionStrings:Runs**: Set to a SQL Server connection string to enable EF Core persistence. If empty in Development, falls back to in-memory. Required in production.
 - In non-Development environments the app fails fast at startup if `Cors:AllowedOrigins` is empty.
 
@@ -170,7 +277,7 @@ The container runs as non-root and exposes a `HEALTHCHECK` against `/healthz`.
 See the in-session plan for the full P0/P1/P2 backlog. Milestones:
 
 - **M2 (EF Core)**: ✅ In progress — SQL Server persistence and migrations have landed; integration tests & handler atomicity are in this wave.
-- **M3** (real LLM backends)
+- **M3 (real LLM backends)**: ✅ Complete — Azure OpenAI, OpenAI, GitHub Models, and Anthropic adapters wired through `IChatClientFactory`. Azure Foundry deferred to M3.5.
 - **M4** (YAML personas + hot reload)
 - **M5** (real workflow engine on `Microsoft.Agents.AI.Workflows`)
 - **M6** (MCP SQL server)

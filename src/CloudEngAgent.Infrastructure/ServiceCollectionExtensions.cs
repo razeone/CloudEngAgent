@@ -1,9 +1,13 @@
+using Azure.Core;
+using Azure.Identity;
 using CloudEngAgent.Application.Abstractions;
 using CloudEngAgent.Application.Runs;
 using CloudEngAgent.Infrastructure.Backends;
+using CloudEngAgent.Infrastructure.Backends.Options;
 using CloudEngAgent.Infrastructure.Persistence;
 using CloudEngAgent.Infrastructure.Personas;
 using CloudEngAgent.Infrastructure.Runs;
+using CloudEngAgent.Infrastructure.Secrets;
 using CloudEngAgent.Infrastructure.Sse;
 using CloudEngAgent.Infrastructure.Workflows;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +16,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace CloudEngAgent.Infrastructure;
 
@@ -66,7 +71,53 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IWorkflowRegistry, InMemoryWorkflowRegistry>();
         services.AddSingleton<IWorkflowEngine, StubWorkflowEngine>();
 
-        services.AddSingleton<IChatClientFactory, NotImplementedChatClientFactory>();
+        // ── Backend options ────────────────────────────────────────────────────
+        services.AddOptions<AzureOpenAiOptions>()
+            .Bind(configuration.GetSection(AzureOpenAiOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<AzureOpenAiOptions>, AzureOpenAiOptionsValidator>();
+
+        services.AddOptions<AzureFoundryOptions>()
+            .Bind(configuration.GetSection(AzureFoundryOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<AzureFoundryOptions>, AzureFoundryOptionsValidator>();
+
+        services.AddOptions<OpenAiOptions>()
+            .Bind(configuration.GetSection(OpenAiOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<OpenAiOptions>, OpenAiOptionsValidator>();
+
+        services.AddOptions<GitHubModelsOptions>()
+            .Bind(configuration.GetSection(GitHubModelsOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<GitHubModelsOptions>, GitHubModelsOptionsValidator>();
+
+        services.AddOptions<AnthropicOptions>()
+            .Bind(configuration.GetSection(AnthropicOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<AnthropicOptions>, AnthropicOptionsValidator>();
+
+        // ── Secrets ────────────────────────────────────────────────────────────
+        var kvUri = configuration["KeyVault:Uri"];
+        if (!string.IsNullOrEmpty(kvUri))
+        {
+            services.AddSingleton<ConfigurationBackendSecretResolver>();
+            services.AddSingleton<IBackendSecretResolver>(sp =>
+                new KeyVaultBackendSecretResolver(
+                    new Uri(kvUri),
+                    sp.GetRequiredService<TokenCredential>(),
+                    sp.GetRequiredService<ConfigurationBackendSecretResolver>()));
+        }
+        else
+        {
+            services.AddSingleton<IBackendSecretResolver, ConfigurationBackendSecretResolver>();
+        }
+
+        // ── Azure credential ───────────────────────────────────────────────────
+        services.TryAddSingleton<TokenCredential>(_ => new DefaultAzureCredential());
+
+        // ── LLM chat client factory ────────────────────────────────────────────
+        services.AddSingleton<IChatClientFactory, ChatClientFactory>();
         services.AddSingleton<IMcpToolRegistry, EmptyMcpToolRegistry>();
 
         // Data Protection is required by the SSE token service. Calling AddDataProtection
