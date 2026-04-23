@@ -25,7 +25,7 @@
     <!-- Auth / Azure -->
     <PackageVersion Include="Microsoft.Identity.Web" Version="3.10.0" />
     <PackageVersion Include="Azure.Identity" Version="1.19.0" />
-    <PackageVersion Include="Azure.Security.KeyVault.Secrets" Version="4.7.0" />
+    <PackageVersion Include="Azure.Security.KeyVault.Secrets" Version="4.10.0" />
     <!-- YAML -->
     <PackageVersion Include="YamlDotNet" Version="16.2.1" />
     <!-- Transitive pins (vulnerability mitigations) -->
