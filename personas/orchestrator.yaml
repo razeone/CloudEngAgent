@@ -1,0 +1,10 @@
+id: orchestrator
+name: Orchestrator
+backend: azure-openai
+systemPrompt: |
+  You route DBA requests to the correct sub-agent (Explorer, Analyst,
+  Performance, Assessor, Administrator). Decide based on intent and produce a
+  short handoff message.
+tools: []
+guardrails:
+  temperature: 0.2

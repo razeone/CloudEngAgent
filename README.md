@@ -194,6 +194,38 @@ public class AgentPersona
 
 When the workflow engine invokes an agent, it uses the persona's `Backend` to look up the configuration and instantiate the appropriate `IChatClient`.
 
+## Personas (M4)
+
+Personas live as YAML files in a directory configured via `Personas:Directory` (defaults to `./personas` relative to the content root). Each file describes a single persona and is hot-reloaded when the file changes on disk.
+
+### Schema
+
+```yaml
+id: explorer                 # required, matches the persona's address
+name: Schema Explorer        # required, human-readable name
+backend: azure-openai        # required, one of: azure-openai, azure-foundry, openai, github-models, anthropic
+systemPrompt: |              # required
+  You discover database structure: schemas, tables, views, columns, indexes,
+  foreign keys. Use the SQL MCP tools to introspect; never modify data.
+tools: []                    # optional, list of mcp:<server>.<tool> refs
+guardrails:                  # optional
+  maxTokens: 2048
+  temperature: 0.1
+  topP: 0.95
+```
+
+### Hot reload
+
+The repository registers a `FileSystemWatcher` on the personas directory and debounces bursts of file events (~500 ms). On every reload it diffs the new snapshot against the previous one and raises `IPersonaRepository.PersonaChanged` for every add, update, or removal. Consumers can subscribe to the event to invalidate caches or re-prime workflows.
+
+If the directory is not present at startup the API falls back to the bundled `InMemoryPersonaRepository` in `Development` and fails fast in any other environment.
+
+### Adding a persona
+
+1. Create `personas/<id>.yaml` with the schema above.
+2. Save the file — the watcher reloads automatically; the new persona becomes available on the next `GET /v1/personas` call.
+3. Invalid YAML or a missing required field is logged and the previous snapshot is kept (the API does not crash).
+
 ## API surface (v1)
 
 | Method | Route                                  | Description                                              |
@@ -251,7 +283,7 @@ This avoids leaking SSE streams to anonymous clients while keeping the EventSour
   "Backends":        { /* per-backend connection settings */ },
   "Secrets":         { /* in-memory fallback secrets (development only) */ },
   "Mcp":             { "Servers": [ /* MCP servers */ ] },
-  "Personas":        { "Path": "./personas" },
+  "Personas":        { "Directory": "./personas", "Watch": true },
   "ConnectionStrings": { "Runs": "" }
 }
 ```
@@ -278,7 +310,7 @@ See the in-session plan for the full P0/P1/P2 backlog. Milestones:
 
 - **M2 (EF Core)**: ✅ In progress — SQL Server persistence and migrations have landed; integration tests & handler atomicity are in this wave.
 - **M3 (real LLM backends)**: ✅ Complete — Azure OpenAI, OpenAI, GitHub Models, and Anthropic adapters wired through `IChatClientFactory`. Azure Foundry deferred to M3.5.
-- **M4** (YAML personas + hot reload)
+- **M4 (YAML personas + hot reload)**: ✅ Complete — see the "Personas (M4)" section above.
 - **M5** (real workflow engine on `Microsoft.Agents.AI.Workflows`)
 - **M6** (MCP SQL server)
 - **M7** (MCP client wiring)

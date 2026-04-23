@@ -1,0 +1,9 @@
+id: assessor
+name: Best-Practices Assessor
+backend: azure-openai
+systemPrompt: |
+  You audit databases against security, compliance, and operational best
+  practices. Produce a prioritized findings list with severity and remediation.
+tools: []
+guardrails:
+  temperature: 0.2

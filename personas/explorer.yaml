@@ -1,0 +1,9 @@
+id: explorer
+name: Schema Explorer
+backend: azure-openai
+systemPrompt: |
+  You discover database structure: schemas, tables, views, columns, indexes,
+  foreign keys. Use the SQL MCP tools to introspect; never modify data.
+tools: []
+guardrails:
+  temperature: 0.1

@@ -20,6 +20,10 @@ public sealed class InMemoryPersonaRepository : IPersonaRepository
         _personas = SeedPersonas().ToDictionary(p => p.Id, StringComparer.Ordinal);
     }
 
+#pragma warning disable CS0067
+    public event EventHandler<PersonaChangedEventArgs>? PersonaChanged;
+#pragma warning restore CS0067
+
     public Task<AgentPersona?> GetAsync(string id, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);

@@ -67,7 +67,7 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<IRunEventBus, InMemoryRunEventBus>();
 
-        services.AddSingleton<IPersonaRepository, InMemoryPersonaRepository>();
+        RegisterPersonaRepository(services, configuration, hostEnvironment);
         services.AddSingleton<IWorkflowRegistry, InMemoryWorkflowRegistry>();
         services.AddSingleton<IWorkflowEngine, StubWorkflowEngine>();
 
@@ -146,5 +146,50 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<InMemoryRunStore>();
         services.AddSingleton<IRunStore>(sp => sp.GetRequiredService<InMemoryRunStore>());
         return services;
+    }
+
+    private static void RegisterPersonaRepository(
+        IServiceCollection services,
+        IConfiguration configuration,
+        IHostEnvironment? hostEnvironment)
+    {
+        var configured = configuration["Personas:Directory"];
+        var contentRoot = hostEnvironment?.ContentRootPath ?? Directory.GetCurrentDirectory();
+        var directory = string.IsNullOrWhiteSpace(configured)
+            ? Path.Combine(contentRoot, "personas")
+            : (Path.IsPathFullyQualified(configured)
+                ? configured
+                : Path.Combine(contentRoot, configured));
+        var watch = configuration.GetValue<bool?>("Personas:Watch") ?? true;
+        var isDevelopment = hostEnvironment is null || hostEnvironment.IsDevelopment();
+
+        if (Directory.Exists(directory))
+        {
+            services.AddSingleton<IPersonaRepository>(sp =>
+                new YamlPersonaRepository(
+                    directory,
+                    sp.GetRequiredService<ILogger<YamlPersonaRepository>>(),
+                    watch));
+            return;
+        }
+
+        if (isDevelopment)
+        {
+            services.AddSingleton<IPersonaRepository>(sp =>
+            {
+                sp.GetRequiredService<ILoggerFactory>()
+                    .CreateLogger("CloudEngAgent.Infrastructure.PersonaRepository")
+                    .LogWarning(
+                        "Personas directory '{Directory}' not found; using InMemoryPersonaRepository " +
+                        "(Development only).",
+                        directory);
+                return new InMemoryPersonaRepository();
+            });
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Personas directory '{directory}' does not exist. Set 'Personas:Directory' or " +
+            "create the directory with at least one *.yaml file.");
     }
 }
