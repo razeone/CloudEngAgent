@@ -312,6 +312,44 @@ If no connection strings are configured the server still boots (and `/healthz` r
 - `SqlException` details are logged in full but only the SQL `Number` + the first line of the message are returned to the client; stack traces never leak through MCP.
 - All tools are **read-only** — there is no DDL/DML surface.
 
+## MCP Client (M7)
+
+The API can act as an MCP **client**, discovering tools from one or more MCP servers and exposing them through `IMcpToolRegistry` for use by the workflow engine. Tool references are namespaced as `mcp:<server>.<tool>` so the same tool name on different servers never collides.
+
+Configure under `Mcp:Client` in `appsettings.json` (or any other `IConfiguration` source — env vars, Key Vault, etc.):
+
+```jsonc
+{
+  "Mcp": {
+    "Client": {
+      "Servers": [
+        {
+          "Name":     "primary",                       // ^[a-zA-Z0-9_-]+$
+          "Endpoint": "http://localhost:5010/mcp",     // HTTP(S) URL of the MCP server
+          "AuthType": "None"                            // None | Bearer
+        },
+        {
+          "Name":     "ops",
+          "Endpoint": "https://ops-mcp.example.com/mcp",
+          "AuthType": "Bearer",
+          "TokenRef": "ops-mcp-token"                   // resolved via IBackendSecretResolver
+        }
+      ]
+    }
+  }
+}
+```
+
+Behaviour:
+
+- When `Mcp:Client:Servers` is empty (default), the API registers a no-op `EmptyMcpToolRegistry` and no MCP traffic is generated.
+- Otherwise, `HttpMcpToolRegistry` lazily opens one `IMcpClient` per configured server (SDK `SseClientTransport` over HTTP) on first use.
+- `ListToolsAsync` aggregates tools from all servers and caches the merged listing for 60 s. Servers that are unreachable (or that throw during listing) are **skipped** with a warning so a single broken server can't take the whole catalog down.
+- `InvokeAsync(ToolRef, …)` parses the server prefix off the qualified name (`<server>.<tool>`) and routes the call to the matching `IMcpClient`. MCP error responses are surfaced as `McpToolInvocationResult { IsError = true }` rather than thrown.
+- On qualified-name collisions the **last server wins** and a warning is logged.
+- When `AuthType: "Bearer"` is set, the registry resolves `TokenRef` through `IBackendSecretResolver` (same path used for LLM backend keys: in-memory config → environment variable → Key Vault if configured) and adds an `Authorization: Bearer <token>` header to outbound MCP traffic.
+- Sessions are disposed cleanly on host shutdown via the `IAsyncDisposable` registered alongside the registry.
+
 ## API surface (v1)
 
 | Method | Route                                  | Description                                              |
@@ -401,6 +439,6 @@ See the in-session plan for the full P0/P1/P2 backlog. Milestones:
 - **M5.1 (single-agent real LLM execution)**: ✅ Complete — see the "Workflow engine (M5.1)" section above.
 - **M5.2** (multi-agent graph orchestration via `Microsoft.Agents.AI.Workflows`)
 - **M6 (MCP SQL server)**: ✅ Complete — see the "MCP Server (M6)" section above.
-- **M7** (MCP client wiring)
+- **M7 (MCP client wiring)**: ✅ Complete — see the "MCP Client (M7)" section above.
 
 Forward-looking features (P3) include resumption, multi-tenancy, persona overlays, a workflow DSL, human-in-the-loop tool approval, cost/token telemetry, and saved investigations.

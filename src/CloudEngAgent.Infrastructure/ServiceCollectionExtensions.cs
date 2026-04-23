@@ -4,6 +4,7 @@ using CloudEngAgent.Application.Abstractions;
 using CloudEngAgent.Application.Runs;
 using CloudEngAgent.Infrastructure.Backends;
 using CloudEngAgent.Infrastructure.Backends.Options;
+using CloudEngAgent.Infrastructure.Mcp;
 using CloudEngAgent.Infrastructure.Persistence;
 using CloudEngAgent.Infrastructure.Personas;
 using CloudEngAgent.Infrastructure.Runs;
@@ -118,7 +119,7 @@ public static class ServiceCollectionExtensions
 
         // ── LLM chat client factory ────────────────────────────────────────────
         services.AddSingleton<IChatClientFactory, ChatClientFactory>();
-        services.AddSingleton<IMcpToolRegistry, EmptyMcpToolRegistry>();
+        RegisterMcpToolRegistry(services, configuration);
 
         // Data Protection is required by the SSE token service. Calling AddDataProtection
         // is idempotent (TryAdd semantics inside) and gives us key rotation + ciphertext.
@@ -196,6 +197,36 @@ public static class ServiceCollectionExtensions
         // opt in via WorkflowEngine:Mode=Real for those.
         return !string.IsNullOrWhiteSpace(configuration["Backends:azure-openai:Endpoint"])
             || !string.IsNullOrWhiteSpace(configuration["Backends:azure-foundry:Endpoint"]);
+    }
+
+    private static void RegisterMcpToolRegistry(
+        IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var section = configuration.GetSection(McpClientOptions.SectionName);
+        var hasServers = section.GetSection("Servers").GetChildren().Any();
+
+        if (!hasServers)
+        {
+            // Preserve historical behavior: no MCP servers configured → empty registry.
+            services.AddSingleton<IMcpToolRegistry, EmptyMcpToolRegistry>();
+            return;
+        }
+
+        services.AddOptions<McpClientOptions>()
+            .Bind(section)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddSingleton<IMcpServerSessionFactory>(sp =>
+            new SdkMcpServerSessionFactory(
+                sp.GetRequiredService<IBackendSecretResolver>(),
+                sp.GetRequiredService<ILoggerFactory>()));
+
+        services.AddSingleton<HttpMcpToolRegistry>();
+        services.AddSingleton<IMcpToolRegistry>(sp => sp.GetRequiredService<HttpMcpToolRegistry>());
+        // Ensure the host disposes the underlying SDK clients on shutdown.
+        services.AddSingleton<IAsyncDisposable>(sp => sp.GetRequiredService<HttpMcpToolRegistry>());
     }
 
     private static void RegisterPersonaRepository(
