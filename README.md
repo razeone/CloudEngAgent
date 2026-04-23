@@ -251,6 +251,67 @@ Selection is driven by `WorkflowEngine:Mode`:
 
 Multi-agent orchestration via `Microsoft.Agents.AI.Workflows` (orchestrator → {explorer, analyst, …}) is the M5.2 follow-up; the M5.1 slice runs the workflow's entry persona as a single agent.
 
+## MCP Server (M6)
+
+`CloudEngAgent.Mcp.Server` is an ASP.NET Core 10 host that exposes a small set of **read-only** SQL Server introspection tools over the [Model Context Protocol](https://modelcontextprotocol.io). It is the server side of the MCP integration; the API project consumes it through the `IMcpToolRegistry` HTTP client (M7).
+
+### Run locally
+
+```powershell
+dotnet run --project src\CloudEngAgent.Mcp.Server
+```
+
+The server listens on a Kestrel-assigned port and exposes:
+
+| Method | Route      | Description                                                             |
+| ------ | ---------- | ----------------------------------------------------------------------- |
+| GET    | `/healthz` | Liveness probe.                                                         |
+| ANY    | `/mcp`     | MCP endpoint (`Streamable HTTP` transport from `ModelContextProtocol.AspNetCore`). |
+
+### Configuration
+
+Connection strings live under `Mcp:SqlServer:ConnectionStrings`. Each entry maps a logical database name (the value MCP callers pass as the `database` argument) to a SQL Server ADO.NET connection string. The first non-empty entry is used when callers omit `database`.
+
+```jsonc
+{
+  "Mcp": {
+    "SqlServer": {
+      "ConnectionStrings": {
+        "default": "Server=localhost,1433;Database=master;User Id=sa;Password=...;TrustServerCertificate=true",
+        "warehouse": "Server=warehouse.example.com;Database=dw;Authentication=Active Directory Default"
+      }
+    }
+  }
+}
+```
+
+For local development use user-secrets (the project ships with a user-secrets id):
+
+```powershell
+dotnet user-secrets set --project src\CloudEngAgent.Mcp.Server `
+  "Mcp:SqlServer:ConnectionStrings:default" `
+  "Server=localhost,1433;Database=master;User Id=sa;Password=Your_strong_Passw0rd!;TrustServerCertificate=true"
+```
+
+If no connection strings are configured the server still boots (and `/healthz` returns OK), but invoking any tool returns a structured `InvalidParams` error so callers get a clear "no connection configured" message.
+
+### Tool catalog
+
+| Tool             | Arguments                                                | Returns                                                                                  |
+| ---------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `list_databases` | `database?`                                              | User database names from `sys.databases` (system DBs excluded).                          |
+| `list_tables`    | `database?`                                              | `{schema, name}` for every base table in `INFORMATION_SCHEMA.TABLES`.                    |
+| `describe_table` | `schema`, `table`, `database?`                           | Columns from `INFORMATION_SCHEMA.COLUMNS` (name, type, nullability, length/precision).   |
+| `sample_rows`    | `schema`, `table`, `top` (1–100, default 10), `database?`| Up to N rows as `{column → value}` dictionaries. `SELECT TOP (n) * FROM ...`.            |
+
+### Safety model
+
+- All tool **values** are sent as `SqlParameter` instances — never concatenated into SQL.
+- All tool **identifiers** (schema/table) must pass a strict allow-list (`^[A-Za-z_][A-Za-z0-9_]{0,127}$`) **and** be present in `INFORMATION_SCHEMA` before being bracket-quoted and interpolated. Anything else is rejected up-front with `InvalidParams`.
+- `sample_rows` enforces a hard cap of 100 rows regardless of the requested `top`.
+- `SqlException` details are logged in full but only the SQL `Number` + the first line of the message are returned to the client; stack traces never leak through MCP.
+- All tools are **read-only** — there is no DDL/DML surface.
+
 ## API surface (v1)
 
 | Method | Route                                  | Description                                              |
@@ -339,7 +400,7 @@ See the in-session plan for the full P0/P1/P2 backlog. Milestones:
 - **M4 (YAML personas + hot reload)**: ✅ Complete — see the "Personas (M4)" section above.
 - **M5.1 (single-agent real LLM execution)**: ✅ Complete — see the "Workflow engine (M5.1)" section above.
 - **M5.2** (multi-agent graph orchestration via `Microsoft.Agents.AI.Workflows`)
-- **M6** (MCP SQL server)
+- **M6 (MCP SQL server)**: ✅ Complete — see the "MCP Server (M6)" section above.
 - **M7** (MCP client wiring)
 
 Forward-looking features (P3) include resumption, multi-tenancy, persona overlays, a workflow DSL, human-in-the-loop tool approval, cost/token telemetry, and saved investigations.

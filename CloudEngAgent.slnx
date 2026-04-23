@@ -10,5 +10,6 @@
     <Project Path="tests/CloudEngAgent.Api.Tests/CloudEngAgent.Api.Tests.csproj" />
     <Project Path="tests/CloudEngAgent.Domain.Tests/CloudEngAgent.Domain.Tests.csproj" />
     <Project Path="tests/CloudEngAgent.Infrastructure.Tests/CloudEngAgent.Infrastructure.Tests.csproj" />
+    <Project Path="tests/CloudEngAgent.Mcp.Server.Tests/CloudEngAgent.Mcp.Server.Tests.csproj" />
   </Folder>
 </Solution>
