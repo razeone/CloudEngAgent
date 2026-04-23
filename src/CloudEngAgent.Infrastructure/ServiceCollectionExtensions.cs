@@ -69,7 +69,7 @@ public static class ServiceCollectionExtensions
 
         RegisterPersonaRepository(services, configuration, hostEnvironment);
         services.AddSingleton<IWorkflowRegistry, InMemoryWorkflowRegistry>();
-        services.AddSingleton<IWorkflowEngine, StubWorkflowEngine>();
+        RegisterWorkflowEngine(services, configuration, hostEnvironment);
 
         // ── Backend options ────────────────────────────────────────────────────
         services.AddOptions<AzureOpenAiOptions>()
@@ -146,6 +146,56 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<InMemoryRunStore>();
         services.AddSingleton<IRunStore>(sp => sp.GetRequiredService<InMemoryRunStore>());
         return services;
+    }
+
+    private static void RegisterWorkflowEngine(
+        IServiceCollection services,
+        IConfiguration configuration,
+        IHostEnvironment? hostEnvironment)
+    {
+        var mode = configuration["WorkflowEngine:Mode"];
+        var isDevelopment = hostEnvironment is null || hostEnvironment.IsDevelopment();
+
+        if (string.Equals(mode, "Stub", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSingleton<IWorkflowEngine, StubWorkflowEngine>();
+            return;
+        }
+
+        if (string.Equals(mode, "Real", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSingleton<IWorkflowEngine, ChatClientWorkflowEngine>();
+            return;
+        }
+
+        // mode is null/empty/Auto: pick based on whether a backend looks ready.
+        var anyBackendConfigured = HasAnyBackendConfigured(configuration);
+        if (anyBackendConfigured)
+        {
+            services.AddSingleton<IWorkflowEngine, ChatClientWorkflowEngine>();
+            return;
+        }
+
+        if (isDevelopment)
+        {
+            services.AddSingleton<IWorkflowEngine, StubWorkflowEngine>();
+            return;
+        }
+
+        throw new InvalidOperationException(
+            "No LLM backend is configured and 'WorkflowEngine:Mode' is not set. " +
+            "Set 'Backends:azure-openai:Endpoint' (or another backend's Endpoint) to enable " +
+            "the real workflow engine, or set 'WorkflowEngine:Mode' to 'Stub' to use the stub.");
+    }
+
+    private static bool HasAnyBackendConfigured(IConfiguration configuration)
+    {
+        // Azure backends signal "really configured" via a non-empty Endpoint.
+        // Key-based backends (openai/github-models/anthropic) cannot be auto-detected
+        // because seed appsettings.json includes placeholder ApiKeyRef values; users
+        // opt in via WorkflowEngine:Mode=Real for those.
+        return !string.IsNullOrWhiteSpace(configuration["Backends:azure-openai:Endpoint"])
+            || !string.IsNullOrWhiteSpace(configuration["Backends:azure-foundry:Endpoint"]);
     }
 
     private static void RegisterPersonaRepository(

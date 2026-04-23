@@ -226,6 +226,31 @@ If the directory is not present at startup the API falls back to the bundled `In
 2. Save the file — the watcher reloads automatically; the new persona becomes available on the next `GET /v1/personas` call.
 3. Invalid YAML or a missing required field is logged and the previous snapshot is kept (the API does not crash).
 
+## Workflow engine (M5.1)
+
+`IWorkflowEngine` has two implementations:
+
+| Implementation              | Behavior                                                                            |
+| --------------------------- | ----------------------------------------------------------------------------------- |
+| `StubWorkflowEngine`        | Emits a canonical AG-UI sequence (handoff → text deltas → tool call/result). Useful for end-to-end tests without an LLM key. |
+| `ChatClientWorkflowEngine`  | Resolves the workflow's entry persona, calls `IChatClient.GetStreamingResponseAsync`, and streams `TextDelta` events for each non-empty chunk. Persona `Guardrails` map to `ChatOptions` (`MaxOutputTokens`, `Temperature`, `TopP`). |
+
+Selection is driven by `WorkflowEngine:Mode`:
+
+```jsonc
+{
+  "WorkflowEngine": {
+    "Mode": "Auto"   // Auto (default) | Real | Stub
+  }
+}
+```
+
+- **Auto** — picks `Real` when `Backends:azure-openai:Endpoint` (or `Backends:azure-foundry:Endpoint`) is set; otherwise picks `Stub` in `Development` and fails fast in any other environment. Key-based backends (openai, github-models, anthropic) are not auto-detected because the seed `appsettings.json` includes placeholder `ApiKeyRef` values; opt in explicitly with `WorkflowEngine:Mode=Real`.
+- **Real** — always uses `ChatClientWorkflowEngine`. Required when you actually want LLM responses.
+- **Stub** — always uses `StubWorkflowEngine`. Useful for CI and offline development.
+
+Multi-agent orchestration via `Microsoft.Agents.AI.Workflows` (orchestrator → {explorer, analyst, …}) is the M5.2 follow-up; the M5.1 slice runs the workflow's entry persona as a single agent.
+
 ## API surface (v1)
 
 | Method | Route                                  | Description                                              |
@@ -284,6 +309,7 @@ This avoids leaking SSE streams to anonymous clients while keeping the EventSour
   "Secrets":         { /* in-memory fallback secrets (development only) */ },
   "Mcp":             { "Servers": [ /* MCP servers */ ] },
   "Personas":        { "Directory": "./personas", "Watch": true },
+  "WorkflowEngine":  { "Mode": "Auto" },                // Auto | Real | Stub
   "ConnectionStrings": { "Runs": "" }
 }
 ```
@@ -311,7 +337,8 @@ See the in-session plan for the full P0/P1/P2 backlog. Milestones:
 - **M2 (EF Core)**: ✅ In progress — SQL Server persistence and migrations have landed; integration tests & handler atomicity are in this wave.
 - **M3 (real LLM backends)**: ✅ Complete — Azure OpenAI, OpenAI, GitHub Models, and Anthropic adapters wired through `IChatClientFactory`. Azure Foundry deferred to M3.5.
 - **M4 (YAML personas + hot reload)**: ✅ Complete — see the "Personas (M4)" section above.
-- **M5** (real workflow engine on `Microsoft.Agents.AI.Workflows`)
+- **M5.1 (single-agent real LLM execution)**: ✅ Complete — see the "Workflow engine (M5.1)" section above.
+- **M5.2** (multi-agent graph orchestration via `Microsoft.Agents.AI.Workflows`)
 - **M6** (MCP SQL server)
 - **M7** (MCP client wiring)
 
