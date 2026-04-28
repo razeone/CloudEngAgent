@@ -7,4 +7,5 @@ public enum RunStatus
     Succeeded = 2,
     Failed = 3,
     Cancelled = 4,
+    PendingInput = 5,
 }
