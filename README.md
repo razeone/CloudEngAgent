@@ -303,12 +303,19 @@ If no connection strings are configured the server still boots (and `/healthz` r
 
 ### Tool catalog
 
-| Tool             | Arguments                                                | Returns                                                                                  |
-| ---------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `list_databases` | `database?`                                              | User database names from `sys.databases` (system DBs excluded).                          |
-| `list_tables`    | `database?`                                              | `{schema, name}` for every base table in `INFORMATION_SCHEMA.TABLES`.                    |
-| `describe_table` | `schema`, `table`, `database?`                           | Columns from `INFORMATION_SCHEMA.COLUMNS` (name, type, nullability, length/precision).   |
-| `sample_rows`    | `schema`, `table`, `top` (1–100, default 10), `database?`| Up to N rows as `{column → value}` dictionaries. `SELECT TOP (n) * FROM ...`.            |
+| Tool                | Arguments                                                | Returns                                                                                            |
+| ------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `list_databases`    | `database?`                                              | User database names from `sys.databases` (system DBs excluded).                                    |
+| `list_tables`       | `database?`                                              | `{schema, name}` for every base table in `INFORMATION_SCHEMA.TABLES`.                              |
+| `describe_table`    | `schema`, `table`, `database?`                           | Columns from `INFORMATION_SCHEMA.COLUMNS` (name, type, nullability, length/precision).             |
+| `sample_rows`       | `schema`, `table`, `top` (1–100, default 10), `database?`| Up to N rows as `{column → value}` dictionaries. `SELECT TOP (n) * FROM ...`.                      |
+| `top_queries`       | `database?`, `top` (1–50, default 10)                    | Top-N queries by total CPU from `sys.dm_exec_query_stats` + `sys.dm_exec_sql_text`. Capped at 50.  |
+| `missing_indexes`   | `database?`                                              | Missing-index recommendations (top 50 by `avg_total_user_cost * avg_user_impact * (seeks+scans)`). |
+| `wait_stats`        | `database?`, `top` (1–50, default 20)                    | Top wait types from `sys.dm_os_wait_stats` with idle/system noise filtered out. Capped at 50.      |
+| `blocking_sessions` | `database?`                                              | Currently blocked sessions (`blocking_session_id <> 0`) with blocker login + blocked SQL text.     |
+| `fk_graph`          | `database?`                                              | Foreign-key graph (one row per FK column; composite FKs produce multiple rows). No row cap.        |
+| `column_stats`      | `schema`, `table`, `database?`                           | Per-column statistics from `sys.stats` + `sys.dm_db_stats_properties`.                             |
+| `db_health_checks`  | `database?`                                              | Curated read-only checks (auto_close, auto_shrink, recovery model, page verify, backups, etc.).    |
 
 ### Safety model
 
