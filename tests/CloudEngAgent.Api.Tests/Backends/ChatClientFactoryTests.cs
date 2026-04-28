@@ -20,6 +20,7 @@ public sealed class ChatClientFactoryTests
         GitHubModelsOptions? gitHubModels = null,
         AzureFoundryOptions? azureFoundry = null,
         AnthropicOptions? anthropic = null,
+        OllamaOptions? ollama = null,
         IBackendSecretResolver? secretResolver = null)
     {
         var azureOpenAiMon = Substitute.For<IOptionsMonitor<AzureOpenAiOptions>>();
@@ -37,12 +38,16 @@ public sealed class ChatClientFactoryTests
         var anthropicMon = Substitute.For<IOptionsMonitor<AnthropicOptions>>();
         anthropicMon.CurrentValue.Returns(anthropic ?? new AnthropicOptions());
 
+        var ollamaMon = Substitute.For<IOptionsMonitor<OllamaOptions>>();
+        ollamaMon.CurrentValue.Returns(ollama ?? new OllamaOptions());
+
         return new ChatClientFactory(
             azureOpenAiMon,
             openAiMon,
             gitHubModelsMon,
             azureFoundryMon,
             anthropicMon,
+            ollamaMon,
             secretResolver ?? Substitute.For<IBackendSecretResolver>(),
             Substitute.For<TokenCredential>(),
             NullLoggerFactory.Instance,
@@ -164,4 +169,42 @@ public sealed class ChatClientFactoryTests
     // Disposal of cached clients is not tested here because the wrapped IChatClient pipeline
     // is constructed internally by ChatClientBuilder and there is no test seam to inject a
     // disposal-tracking double without changing the adapter shape (out-of-scope for this todo).
+
+    [Fact]
+    public void Create_Ollama_ValidOptions_ReturnsNonNullClient()
+    {
+        // Ollama (OllamaSharp) constructs an OllamaApiClient against the configured endpoint
+        // without performing any network calls during construction.
+        var opts = new OllamaOptions
+        {
+            Endpoint = "http://localhost:11434",
+            Model = "llama3.1:8b"
+        };
+        var factory = CreateFactory(ollama: opts);
+
+        var client = factory.Create(BackendId.Ollama);
+
+        client.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Create_Ollama_WithApiKeyRef_ResolvesSecret()
+    {
+        var secrets = Substitute.For<IBackendSecretResolver>();
+        secrets.ResolveAsync("ollama-proxy-token", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult("bearer-fake"));
+
+        var opts = new OllamaOptions
+        {
+            Endpoint = "https://ollama-proxy.example.com",
+            Model = "llama3.1:8b",
+            ApiKeyRef = "ollama-proxy-token"
+        };
+        var factory = CreateFactory(ollama: opts, secretResolver: secrets);
+
+        var client = factory.Create(BackendId.Ollama);
+
+        client.Should().NotBeNull();
+        secrets.Received(1).ResolveAsync("ollama-proxy-token", Arg.Any<CancellationToken>());
+    }
 }

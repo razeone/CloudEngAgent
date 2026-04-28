@@ -21,6 +21,7 @@ public sealed class ChatClientFactory : IChatClientFactory, IDisposable
     private readonly IOptionsMonitor<GitHubModelsOptions> _gitHubModelsOptions;
     private readonly IOptionsMonitor<AzureFoundryOptions> _azureFoundryOptions;
     private readonly IOptionsMonitor<AnthropicOptions> _anthropicOptions;
+    private readonly IOptionsMonitor<OllamaOptions> _ollamaOptions;
     private readonly IBackendSecretResolver _secrets;
     private readonly TokenCredential _credential;
     private readonly ILoggerFactory _loggerFactory;
@@ -33,6 +34,7 @@ public sealed class ChatClientFactory : IChatClientFactory, IDisposable
         IOptionsMonitor<GitHubModelsOptions> gitHubModelsOptions,
         IOptionsMonitor<AzureFoundryOptions> azureFoundryOptions,
         IOptionsMonitor<AnthropicOptions> anthropicOptions,
+        IOptionsMonitor<OllamaOptions> ollamaOptions,
         IBackendSecretResolver secrets,
         TokenCredential credential,
         ILoggerFactory loggerFactory,
@@ -43,6 +45,7 @@ public sealed class ChatClientFactory : IChatClientFactory, IDisposable
         _gitHubModelsOptions = gitHubModelsOptions;
         _azureFoundryOptions = azureFoundryOptions;
         _anthropicOptions = anthropicOptions;
+        _ollamaOptions = ollamaOptions;
         _secrets = secrets;
         _credential = credential;
         _loggerFactory = loggerFactory;
@@ -77,6 +80,10 @@ public sealed class ChatClientFactory : IChatClientFactory, IDisposable
         else if (backend == BackendId.Anthropic)
         {
             raw = AnthropicChatClientAdapter.Create(_anthropicOptions.CurrentValue, _secrets);
+        }
+        else if (backend == BackendId.Ollama)
+        {
+            raw = OllamaChatClientAdapter.Create(_ollamaOptions.CurrentValue, _secrets);
         }
         else
         {

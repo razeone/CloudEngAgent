@@ -98,6 +98,11 @@ public static class ServiceCollectionExtensions
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<AnthropicOptions>, AnthropicOptionsValidator>();
 
+        services.AddOptions<OllamaOptions>()
+            .Bind(configuration.GetSection(OllamaOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<OllamaOptions>, OllamaOptionsValidator>();
+
         // ── Secrets ────────────────────────────────────────────────────────────
         var kvUri = configuration["KeyVault:Uri"];
         if (!string.IsNullOrEmpty(kvUri))

@@ -38,6 +38,7 @@
     <PackageReference Include="Azure.AI.Inference" />
     <PackageReference Include="OpenAI" />
     <PackageReference Include="Anthropic.SDK" />
+    <PackageReference Include="OllamaSharp" />
 
     <!-- MCP client -->
     <PackageReference Include="ModelContextProtocol" />
