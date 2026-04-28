@@ -9,6 +9,11 @@ public enum RunEventType
     AgentHandoff = 4,
     RunFinished = 5,
     Error = 6,
+    UiWidgetSnapshot = 7,
+    UiWidgetDelta = 8,
+    UiInputRequested = 9,
+    UiInputReceived = 10,
+    ArtifactCreated = 11,
 }
 
 public sealed record RunEvent(

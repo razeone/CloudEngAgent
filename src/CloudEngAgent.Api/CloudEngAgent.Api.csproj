@@ -6,6 +6,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="CloudEngAgent.Api.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\CloudEngAgent.Application\CloudEngAgent.Application.csproj" />
     <ProjectReference Include="..\CloudEngAgent.Infrastructure\CloudEngAgent.Infrastructure.csproj" />
   </ItemGroup>
