@@ -24,7 +24,7 @@
     <PackageVersion Include="Npgsql" Version="9.0.2" />
     <!-- Auth / Azure -->
     <PackageVersion Include="Microsoft.Identity.Web" Version="4.8.0" />
-    <PackageVersion Include="Azure.Identity" Version="1.19.0" />
+    <PackageVersion Include="Azure.Identity" Version="1.21.0" />
     <PackageVersion Include="Azure.Security.KeyVault.Secrets" Version="4.10.0" />
     <!-- YAML -->
     <PackageVersion Include="YamlDotNet" Version="17.0.1" />
