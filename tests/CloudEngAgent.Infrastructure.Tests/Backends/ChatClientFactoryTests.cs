@@ -16,6 +16,7 @@ public sealed class ChatClientFactoryTests
 {
     private static ChatClientFactory BuildFactory(
         AnthropicOptions? anthropicOpts = null,
+        OllamaOptions? ollamaOpts = null,
         IBackendSecretResolver? secrets = null)
     {
         var resolver = secrets ?? Substitute.For<IBackendSecretResolver>();
@@ -29,6 +30,11 @@ public sealed class ChatClientFactoryTests
             {
                 Model = "claude-3-5-sonnet-20241022",
                 ApiKeyRef = "anthropic-key",
+            }).AsMonitor(),
+            ollamaOptions: Options.Create(ollamaOpts ?? new OllamaOptions
+            {
+                Endpoint = "http://localhost:11434",
+                Model = "llama3.1:8b",
             }).AsMonitor(),
             secrets: resolver,
             credential: Substitute.For<TokenCredential>(),
@@ -89,6 +95,41 @@ public sealed class ChatClientFactoryTests
 
         var factory = BuildFactory(secrets: resolver);
         factory.Create(BackendId.Anthropic);
+
+        var act = () => factory.Dispose();
+
+        act.Should().NotThrow();
+    }
+
+    // ── Ollama ────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Create_Ollama_returns_IChatClient()
+    {
+        var factory = BuildFactory();
+
+        var client = factory.Create(BackendId.Ollama);
+
+        client.Should().NotBeNull();
+        client.Should().BeAssignableTo<IChatClient>();
+    }
+
+    [Fact]
+    public void Create_Ollama_returns_same_instance_on_second_call()
+    {
+        var factory = BuildFactory();
+
+        var first = factory.Create(BackendId.Ollama);
+        var second = factory.Create(BackendId.Ollama);
+
+        second.Should().BeSameAs(first);
+    }
+
+    [Fact]
+    public void Dispose_does_not_throw_when_Ollama_client_was_created()
+    {
+        var factory = BuildFactory();
+        factory.Create(BackendId.Ollama);
 
         var act = () => factory.Dispose();
 

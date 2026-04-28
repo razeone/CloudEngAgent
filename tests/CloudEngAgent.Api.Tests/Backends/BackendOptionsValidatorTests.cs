@@ -171,4 +171,47 @@ public sealed class BackendOptionsValidatorTests
         var result = BackendOptionsValidator.ValidateAnthropic(opts);
         result.Succeeded.Should().BeTrue();
     }
+
+    // ── Ollama ────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Ollama_Empty_Passes()
+    {
+        var result = BackendOptionsValidator.ValidateOllama(new OllamaOptions());
+        result.Succeeded.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Ollama_EndpointOnly_Fails_WithHelpfulMessage()
+    {
+        var opts = new OllamaOptions { Endpoint = "http://localhost:11434" };
+        var result = BackendOptionsValidator.ValidateOllama(opts);
+        result.Succeeded.Should().BeFalse();
+        result.FailureMessage.Should().Contain("Model");
+    }
+
+    [Fact]
+    public void Ollama_FullyValid_Passes()
+    {
+        var opts = new OllamaOptions
+        {
+            Endpoint = "http://localhost:11434",
+            Model = "llama3.1:8b"
+        };
+        var result = BackendOptionsValidator.ValidateOllama(opts);
+        result.Succeeded.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Ollama_WithApiKeyRef_Passes()
+    {
+        var opts = new OllamaOptions
+        {
+            Endpoint = "https://ollama-proxy.example.com",
+            Model = "llama3.1:8b",
+            ApiKeyRef = "ollama-proxy-token"
+        };
+        var result = BackendOptionsValidator.ValidateOllama(opts);
+        result.Succeeded.Should().BeTrue();
+    }
 }

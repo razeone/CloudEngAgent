@@ -11,10 +11,11 @@ public sealed record BackendId
     public static BackendId Anthropic { get; } = new("anthropic");
     public static BackendId GitHubModels { get; } = new("github-models");
     public static BackendId OpenAi { get; } = new("openai");
+    public static BackendId Ollama { get; } = new("ollama");
 
     public static IReadOnlyList<BackendId> All { get; } = new[]
     {
-        AzureOpenAi, AzureFoundry, Anthropic, GitHubModels, OpenAi
+        AzureOpenAi, AzureFoundry, Anthropic, GitHubModels, OpenAi, Ollama
     };
 
     public static BackendId Parse(string value)

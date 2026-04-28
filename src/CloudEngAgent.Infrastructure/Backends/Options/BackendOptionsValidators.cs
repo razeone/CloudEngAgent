@@ -90,6 +90,22 @@ internal static class BackendOptionsValidator
         return Summarize(errors);
     }
 
+    public static ValidateOptionsResult ValidateOllama(OllamaOptions opts)
+    {
+        // No Endpoint → user hasn't configured this backend; skip.
+        if (string.IsNullOrEmpty(opts.Endpoint))
+            return ValidateOptionsResult.Success;
+
+        var errors = new List<string>();
+
+        if (string.IsNullOrEmpty(opts.Model))
+            errors.Add($"'{OllamaOptions.SectionName}:Model' is required when Endpoint is configured.");
+
+        // ApiKeyRef is optional; AuthMode is intentionally not enforced for Ollama.
+
+        return Summarize(errors);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static bool IsApiKeyMode(string authMode) =>
@@ -139,4 +155,10 @@ internal sealed class AnthropicOptionsValidator : IValidateOptions<AnthropicOpti
 {
     public ValidateOptionsResult Validate(string? name, AnthropicOptions options) =>
         BackendOptionsValidator.ValidateAnthropic(options);
+}
+
+internal sealed class OllamaOptionsValidator : IValidateOptions<OllamaOptions>
+{
+    public ValidateOptionsResult Validate(string? name, OllamaOptions options) =>
+        BackendOptionsValidator.ValidateOllama(options);
 }

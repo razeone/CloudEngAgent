@@ -12,6 +12,7 @@ public class BackendIdTests
     [InlineData("anthropic")]
     [InlineData("github-models")]
     [InlineData("openai")]
+    [InlineData("ollama")]
     public void Parse_returns_instance_for_known_id(string value)
     {
         var id = BackendId.Parse(value);
@@ -41,14 +42,20 @@ public class BackendIdTests
     }
 
     [Fact]
-    public void All_contains_five_backends()
+    public void All_contains_six_backends()
     {
-        BackendId.All.Should().HaveCount(5);
+        BackendId.All.Should().HaveCount(6);
     }
 
     [Fact]
     public void Parse_returns_same_reference_as_static_catalog()
     {
         BackendId.Parse("anthropic").Should().BeSameAs(BackendId.Anthropic);
+    }
+
+    [Fact]
+    public void Parse_returns_same_reference_for_ollama()
+    {
+        BackendId.Parse("ollama").Should().BeSameAs(BackendId.Ollama);
     }
 }
