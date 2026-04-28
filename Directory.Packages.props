@@ -21,7 +21,7 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.7" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.7" />
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.0.0" />
-    <PackageVersion Include="Npgsql" Version="9.0.2" />
+    <PackageVersion Include="Npgsql" Version="10.0.2" />
     <!-- Auth / Azure -->
     <PackageVersion Include="Microsoft.Identity.Web" Version="4.8.0" />
     <PackageVersion Include="Azure.Identity" Version="1.21.0" />
