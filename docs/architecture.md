@@ -62,7 +62,7 @@ encounter most often:
 | `IRunStore`            | Persist `Run` aggregates and append `RunEvent`s.                        | `EfCoreRunStore`                | `InMemoryRunStore`     |
 | `IWorkflowEngine`      | Execute a workflow for a given run, producing a stream of `RunEvent`s.  | `ChatClientWorkflowEngine`      | `StubWorkflowEngine`   |
 | `IPersonaRepository`   | Look up personas by id; raise `PersonaChanged` on hot reload.           | `YamlPersonaRepository`         | `InMemoryPersonaRepository` |
-| `IChatClientFactory`   | Resolve an `IChatClient` for a given `BackendId`.                       | One per backend (Azure OpenAI, OpenAI, GitHub Models, Anthropic). | n/a |
+| `IChatClientFactory`   | Resolve an `IChatClient` for a given `BackendId`.                       | One per backend (Azure OpenAI, OpenAI, GitHub Models, Anthropic, Ollama). | n/a |
 | `IBackendSecretResolver` | Resolve `ApiKeyRef` → secret value (Key Vault → config → env var).    | `BackendSecretResolver`         | n/a                    |
 | `IMcpToolRegistry`     | List & invoke MCP tools, namespaced as `mcp:<server>.<tool>`.           | `HttpMcpToolRegistry`           | `EmptyMcpToolRegistry` |
 
@@ -124,10 +124,11 @@ Schema and an example are in the
 ## LLM backends: pluggable via `IChatClientFactory`
 
 Each `AgentPersona` has a `BackendId` (e.g. `azure-openai`, `openai`,
-`github-models`, `anthropic`). The factory looks up the configuration under
-`Backends:<id>`, resolves the auth (managed identity for Azure, API key
-otherwise), and returns an `IChatClient`. Adding a new backend is a localized
-change — see [`development.md`](development.md#add-a-new-llm-backend).
+`github-models`, `anthropic`, `ollama`). The factory looks up the configuration
+under `Backends:<id>`, resolves the auth (managed identity for Azure, API key
+for hosted providers, unauthenticated by default for Ollama), and returns an
+`IChatClient`. Adding a new backend is a localized change — see
+[`development.md`](development.md#add-a-new-llm-backend).
 
 ## MCP: server *and* client
 

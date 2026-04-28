@@ -109,6 +109,7 @@ CloudEngAgent routes agent calls to multiple LLM providers via an `IChatClientFa
 | `openai` | ✅ Implemented | OpenAI API (gpt-4o, gpt-4-turbo, etc.) |
 | `github-models` | ✅ Implemented | GitHub Models (Azure-hosted inference) |
 | `anthropic` | ✅ Implemented | Anthropic API (Claude models via `Anthropic.SDK`) |
+| `ollama` | ✅ Implemented | Ollama local server or proxied deployment (via `OllamaSharp`) |
 | `azure-foundry` | 🔜 M3.5 | Azure AI Foundry (deferred) |
 
 ### Per-backend configuration
@@ -137,6 +138,11 @@ Each backend is configured under `Backends:<id>` in `appsettings.json`. Example 
     "ApiKeyRef": "anthropic-key",
     "AuthMode": "ApiKey"
   },
+  "ollama": {
+    "Endpoint": "http://localhost:11434",              // Ollama server base URI
+    "Model": "llama3.1:8b",
+    "ApiKeyRef": ""                                    // optional; only set for proxied/secured deployments
+  },
   "azure-foundry": {
     "Endpoint": "https://my-foundry-endpoint/",
     "Model": "some-model-id",
@@ -150,6 +156,7 @@ Each backend is configured under `Backends:<id>` in `appsettings.json`. Example 
 
 - **ManagedIdentity** (Azure backends only): Uses `DefaultAzureCredential` (Entra ID managed identity in production, `az login` credentials locally).
 - **ApiKey**: Requires `ApiKeyRef` pointing to a secret that is resolved as described below.
+- **Unauthenticated** (Ollama only): Ollama is unauthenticated by default — leave `ApiKeyRef` empty. The `AuthMode` field is **not** honored for Ollama; presence/absence of `ApiKeyRef` alone determines whether a Bearer token is sent (useful for proxied/secured Ollama deployments).
 
 ### Secret resolution order
 
@@ -176,6 +183,10 @@ dotnet user-secrets set --project src/CloudEngAgent.Api "Secrets:github-pat" "gh
 
 # Set Anthropic key
 dotnet user-secrets set --project src/CloudEngAgent.Api "Secrets:anthropic-key" "sk-ant-..."
+
+# Ollama runs locally and is unauthenticated by default — no secret required.
+# Only set a secret if you front Ollama with an authenticating proxy:
+# dotnet user-secrets set --project src/CloudEngAgent.Api "Secrets:ollama-token" "..."
 ```
 
 Then run the API:
@@ -209,7 +220,7 @@ Personas live as YAML files in a directory configured via `Personas:Directory` (
 ```yaml
 id: explorer                 # required, matches the persona's address
 name: Schema Explorer        # required, human-readable name
-backend: azure-openai        # required, one of: azure-openai, azure-foundry, openai, github-models, anthropic
+backend: azure-openai        # required, one of: azure-openai, azure-foundry, openai, github-models, anthropic, ollama
 systemPrompt: |              # required
   You discover database structure: schemas, tables, views, columns, indexes,
   foreign keys. Use the SQL MCP tools to introspect; never modify data.
@@ -251,7 +262,7 @@ Selection is driven by `WorkflowEngine:Mode`:
 }
 ```
 
-- **Auto** — picks `Real` when `Backends:azure-openai:Endpoint` (or `Backends:azure-foundry:Endpoint`) is set; otherwise picks `Stub` in `Development` and fails fast in any other environment. Key-based backends (openai, github-models, anthropic) are not auto-detected because the seed `appsettings.json` includes placeholder `ApiKeyRef` values; opt in explicitly with `WorkflowEngine:Mode=Real`.
+- **Auto** — picks `Real` when `Backends:azure-openai:Endpoint` (or `Backends:azure-foundry:Endpoint`) is set; otherwise picks `Stub` in `Development` and fails fast in any other environment. Key-based backends (openai, github-models, anthropic) and Ollama are not auto-detected because the seed `appsettings.json` ships with empty/placeholder values; opt in explicitly with `WorkflowEngine:Mode=Real`.
 - **Real** — always uses `ChatClientWorkflowEngine`. Required when you actually want LLM responses.
 - **Stub** — always uses `StubWorkflowEngine`. Useful for CI and offline development.
 
@@ -440,7 +451,7 @@ The container runs as non-root and exposes a `HEALTHCHECK` against `/healthz`.
 See the in-session plan for the full P0/P1/P2 backlog. Milestones:
 
 - **M2 (EF Core)**: ✅ In progress — SQL Server persistence and migrations have landed; integration tests & handler atomicity are in this wave.
-- **M3 (real LLM backends)**: ✅ Complete — Azure OpenAI, OpenAI, GitHub Models, and Anthropic adapters wired through `IChatClientFactory`. Azure Foundry deferred to M3.5.
+- **M3 (real LLM backends)**: ✅ Complete — Azure OpenAI, OpenAI, GitHub Models, Anthropic, and Ollama adapters wired through `IChatClientFactory`. Azure Foundry deferred to M3.5.
 - **M4 (YAML personas + hot reload)**: ✅ Complete — see the "Personas (M4)" section above.
 - **M5.1 (single-agent real LLM execution)**: ✅ Complete — see the "Workflow engine (M5.1)" section above.
 - **M5.2** (multi-agent graph orchestration via `Microsoft.Agents.AI.Workflows`)

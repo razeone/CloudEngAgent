@@ -151,6 +151,11 @@ dotnet user-secrets set --project src/CloudEngAgent.Api "Secrets:openai-key"    
 dotnet user-secrets set --project src/CloudEngAgent.Api "Secrets:github-pat"     "ghp_..."
 dotnet user-secrets set --project src/CloudEngAgent.Api "Secrets:anthropic-key"  "sk-ant-..."
 
+# Or run a model locally with Ollama (no key required) — set the endpoint/model
+# in appsettings (or via --Backends:ollama:Endpoint / --Backends:ollama:Model).
+# Example: install Ollama, then `ollama pull llama3.1:8b` and point
+# Backends:ollama:Endpoint at http://localhost:11434.
+
 # And/or a SQL Server connection string for the run store
 dotnet user-secrets set --project src/CloudEngAgent.Api \
     "ConnectionStrings:Runs" \
