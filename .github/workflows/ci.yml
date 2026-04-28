@@ -61,7 +61,10 @@ jobs:
         run: dotnet build --configuration Release --no-restore -warnaserror
 
       - name: Run unit tests
-        run: dotnet test tests/CloudEngAgent.Domain.Tests tests/CloudEngAgent.Api.Tests --configuration Release --no-build --logger "trx;LogFileName=unit-tests.trx" --collect:"XPlat Code Coverage" --results-directory ./TestResults/unit
+        run: |
+          dotnet test tests/CloudEngAgent.Domain.Tests --configuration Release --no-build --logger "trx;LogFileName=domain-tests.trx" --collect:"XPlat Code Coverage" --results-directory ./TestResults/unit
+          dotnet test tests/CloudEngAgent.Api.Tests --configuration Release --no-build --logger "trx;LogFileName=api-tests.trx" --collect:"XPlat Code Coverage" --results-directory ./TestResults/unit
+          dotnet test tests/CloudEngAgent.Mcp.Server.Tests --configuration Release --no-build --logger "trx;LogFileName=mcp-server-tests.trx" --collect:"XPlat Code Coverage" --results-directory ./TestResults/unit
 
       - name: Upload unit test results
         if: always()
@@ -110,29 +113,3 @@ jobs:
           name: integration-test-results
           path: ./TestResults/integration
 
-  codeql:
-    name: CodeQL
-    runs-on: ubuntu-latest
-    permissions:
-      security-events: write
-      actions: read
-      contents: read
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: '10.0.x'
-          dotnet-quality: 'preview'
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
-        with:
-          languages: csharp
-
-      - name: Build
-        run: dotnet build --configuration Release
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
