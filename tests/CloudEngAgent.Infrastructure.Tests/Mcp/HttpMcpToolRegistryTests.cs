@@ -332,7 +332,7 @@ public sealed class HttpMcpToolRegistryTests
     }
 
     [Fact]
-    public void DI_with_configured_servers_registers_HttpMcpToolRegistry()
+    public async Task DI_with_configured_servers_registers_HttpMcpToolRegistry()
     {
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -357,12 +357,12 @@ public sealed class HttpMcpToolRegistryTests
         }
         finally
         {
-            ((IAsyncDisposable)sp).DisposeAsync().AsTask().GetAwaiter().GetResult();
+            await ((IAsyncDisposable)sp).DisposeAsync();
         }
     }
 
     [Fact]
-    public void DI_rejects_invalid_server_name()
+    public async Task DI_rejects_invalid_server_name()
     {
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -386,7 +386,7 @@ public sealed class HttpMcpToolRegistryTests
         }
         finally
         {
-            ((IAsyncDisposable)sp).DisposeAsync().AsTask().GetAwaiter().GetResult();
+            await ((IAsyncDisposable)sp).DisposeAsync();
         }
     }
 
