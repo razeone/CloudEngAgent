@@ -57,8 +57,17 @@ Use this when you want to support a new provider (e.g., a hypothetical
    integration smoke test if the SDK supports an offline mode.
 
 The `WorkflowEngine:Mode = Auto` heuristic only auto-detects Azure backends
-today (because key-based backends ship with placeholder `ApiKeyRef` values).
-Document the explicit `WorkflowEngine:Mode=Real` opt-in for your backend.
+today (because key-based backends ship with placeholder `ApiKeyRef` values,
+and Ollama ships with an empty `Endpoint`). Document the explicit
+`WorkflowEngine:Mode=Real` opt-in for your backend.
+
+> **Auth variations.** Most hosted backends use either managed identity
+> (Azure) or `ApiKeyRef` + `IBackendSecretResolver`. The Ollama backend is the
+> exception: it is unauthenticated by default, and `ApiKeyRef` is only
+> resolved (as a Bearer token) when the Ollama server is fronted by an
+> authenticating proxy. If your new backend has a similar custom auth model,
+> follow the Ollama adapter pattern in
+> `src/CloudEngAgent.Infrastructure/Backends/Adapters/`.
 
 ## Add a new MCP tool (server side)
 
