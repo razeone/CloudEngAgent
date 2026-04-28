@@ -61,7 +61,10 @@ jobs:
         run: dotnet build --configuration Release --no-restore -warnaserror
 
       - name: Run unit tests
-        run: dotnet test tests/CloudEngAgent.Domain.Tests tests/CloudEngAgent.Api.Tests --configuration Release --no-build --logger "trx;LogFileName=unit-tests.trx" --collect:"XPlat Code Coverage" --results-directory ./TestResults/unit
+        run: |
+          dotnet test tests/CloudEngAgent.Domain.Tests --configuration Release --no-build --logger "trx;LogFileName=domain-tests.trx" --collect:"XPlat Code Coverage" --results-directory ./TestResults/unit
+          dotnet test tests/CloudEngAgent.Api.Tests --configuration Release --no-build --logger "trx;LogFileName=api-tests.trx" --collect:"XPlat Code Coverage" --results-directory ./TestResults/unit
+          dotnet test tests/CloudEngAgent.Mcp.Server.Tests --configuration Release --no-build --logger "trx;LogFileName=mcp-server-tests.trx" --collect:"XPlat Code Coverage" --results-directory ./TestResults/unit
 
       - name: Upload unit test results
         if: always()
