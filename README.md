@@ -2,6 +2,12 @@
 
 A multi-agent .NET 10 backend that empowers DBAs and power users with AI-driven exploration, analysis, and administration of SQL databases. Connects to multiple LLM backends and exposes operational tools through MCP (Model Context Protocol). Streams results to clients over an [AG-UI](https://docs.ag-ui.com/) compatible API.
 
+> **New here?** Start with [`CONTRIBUTING.md`](CONTRIBUTING.md) and the
+> [`docs/`](docs/) folder — they cover prerequisites, a guided
+> [first-day onboarding](docs/onboarding.md), an
+> [architecture overview](docs/architecture.md), and recipes for common
+> changes. The rest of this README is the operator/user reference.
+
 ## Status
 
 Early development. The HTTP + AG-UI streaming layer is in place with in-memory stubs for the workflow engine, persona repository, and run store. Real EF Core persistence, real LLM/MCP backends, and the multi-agent workflow graph land in milestones M2–M7 (see `session-state/.../plan.md`).
