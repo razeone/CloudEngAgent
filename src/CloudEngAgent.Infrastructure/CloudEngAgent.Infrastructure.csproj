@@ -55,6 +55,10 @@
     <!-- Transitive vulnerability mitigation (pulled via Microsoft.Identity.Client -> older System.Security.Cryptography.Xml) -->
     <PackageReference Include="System.Security.Cryptography.Xml" />
 
+    <!-- Transitive vulnerability mitigation: pin OpenTelemetry.Api >= 1.15.3 (GHSA-g94r-2vxg-569j) -->
+    <PackageReference Include="OpenTelemetry.Api" />
+    <PackageReference Include="OpenTelemetry.Extensions.Propagators" />
+
     <!-- YAML -->
     <PackageReference Include="YamlDotNet" />
 
