@@ -10,6 +10,13 @@ builder.Services
 
 builder.Services.AddSingleton<ISqlConnectionFactory, SqlConnectionFactory>();
 builder.Services.AddSingleton<SqlServerTools>();
+builder.Services.AddSingleton<TopQueriesTool>();
+builder.Services.AddSingleton<MissingIndexesTool>();
+builder.Services.AddSingleton<WaitStatsTool>();
+builder.Services.AddSingleton<BlockingSessionsTool>();
+builder.Services.AddSingleton<FkGraphTool>();
+builder.Services.AddSingleton<ColumnStatsTool>();
+builder.Services.AddSingleton<DbHealthChecksTool>();
 
 builder.Services
     .AddMcpServer()
