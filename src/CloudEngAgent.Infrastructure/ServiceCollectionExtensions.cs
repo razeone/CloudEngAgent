@@ -2,8 +2,10 @@ using Azure.Core;
 using Azure.Identity;
 using CloudEngAgent.Application.Abstractions;
 using CloudEngAgent.Application.Runs;
+using CloudEngAgent.Infrastructure.Artifacts;
 using CloudEngAgent.Infrastructure.Backends;
 using CloudEngAgent.Infrastructure.Backends.Options;
+using CloudEngAgent.Infrastructure.Inputs;
 using CloudEngAgent.Infrastructure.Mcp;
 using CloudEngAgent.Infrastructure.Persistence;
 using CloudEngAgent.Infrastructure.Personas;
@@ -45,6 +47,11 @@ public static class ServiceCollectionExtensions
             services.AddPooledDbContextFactory<RunsDbContext>(opts => opts.UseSqlServer(cs));
             services.AddSingleton<IRunStore, EfCoreRunStore>();
             services.AddHealthChecks().AddDbContextCheck<RunsDbContext>("runs-db");
+
+            services.AddOptions<ArtifactStoreOptions>()
+                .Bind(configuration.GetSection(ArtifactStoreOptions.SectionName));
+            services.AddScoped<IInputRequestStore, InputRequestStore>();
+            services.AddScoped<IArtifactStore, FileSystemArtifactStore>();
         }
         else if (hostEnvironment is null || hostEnvironment.IsDevelopment())
         {
