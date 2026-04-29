@@ -1,0 +1,219 @@
+[
+  { "type": "RunStarted", "runId": "r1", "timestamp": "2025-01-15T10:00:00Z" },
+
+  { "type": "StepStarted", "runId": "r1", "stepId": "orchestrator", "agent": "orchestrator", "timestamp": "2025-01-15T10:00:01Z" },
+  { "type": "TextMessageChunk", "runId": "r1", "stepId": "orchestrator", "messageId": "m1", "role": "assistant", "delta": "Planning a performance investigation on the Posts table." },
+  { "type": "StepFinished", "runId": "r1", "stepId": "orchestrator", "status": "ok", "timestamp": "2025-01-15T10:00:02Z" },
+
+  { "type": "StepStarted", "runId": "r1", "stepId": "performance", "agent": "perf", "timestamp": "2025-01-15T10:00:03Z" },
+  {
+    "type": "StateSnapshot",
+    "runId": "r1",
+    "state": {
+      "widgets": {
+        "run:r1/step:performance/agent:perf/widget:kpi": {
+          "id": "run:r1/step:performance/agent:perf/widget:kpi",
+          "type": "kpi-cards",
+          "status": "complete",
+          "title": "Workload KPIs",
+          "summary": "Top 3 workload metrics",
+          "placement": { "surface": "timeline", "order": 1 },
+          "props": {
+            "cards": [
+              { "label": "Avg duration (ms)", "value": 842, "delta": "+12%", "tone": "negative" },
+              { "label": "Reads", "value": "1.2M", "tone": "neutral" },
+              { "label": "Plan count", "value": 7, "tone": "neutral" }
+            ]
+          }
+        },
+        "run:r1/step:performance/agent:perf/widget:chart": {
+          "id": "run:r1/step:performance/agent:perf/widget:chart",
+          "type": "bar-chart",
+          "status": "complete",
+          "title": "Top queries by CPU",
+          "summary": "CPU ms per query family",
+          "placement": { "surface": "timeline", "order": 2 },
+          "props": {
+            "series": [
+              { "name": "Posts.OwnerUserId", "value": 9120 },
+              { "name": "Votes.PostId", "value": 4310 },
+              { "name": "Comments.UserId", "value": 1875 }
+            ],
+            "xLabel": "query",
+            "yLabel": "cpu_ms"
+          }
+        },
+        "run:r1/step:performance/agent:perf/widget:rows": {
+          "id": "run:r1/step:performance/agent:perf/widget:rows",
+          "type": "result-table",
+          "status": "streaming",
+          "title": "Slow queries",
+          "summary": "Queries from sys.dm_exec_query_stats",
+          "placement": { "surface": "timeline", "order": 3 },
+          "props": {
+            "columns": [
+              { "key": "query_id", "label": "id" },
+              { "key": "table", "label": "table" },
+              { "key": "avg_ms", "label": "avg ms" }
+            ],
+            "rows": [
+              { "query_id": "q1", "table": "Posts", "avg_ms": 842 }
+            ],
+            "totalRows": 3
+          }
+        }
+      }
+    },
+    "timestamp": "2025-01-15T10:00:04Z"
+  },
+  {
+    "type": "StateDelta",
+    "runId": "r1",
+    "patches": [
+      {
+        "op": "add",
+        "path": "/widgets/run:r1~1step:performance~1agent:perf~1widget:rows/props/rows/-",
+        "value": { "query_id": "q2", "table": "Votes", "avg_ms": 410 }
+      },
+      {
+        "op": "add",
+        "path": "/widgets/run:r1~1step:performance~1agent:perf~1widget:rows/props/rows/-",
+        "value": { "query_id": "q3", "table": "Comments", "avg_ms": 188 }
+      }
+    ],
+    "timestamp": "2025-01-15T10:00:05Z"
+  },
+  {
+    "type": "StateDelta",
+    "runId": "r1",
+    "patches": [
+      {
+        "op": "replace",
+        "path": "/widgets/run:r1~1step:performance~1agent:perf~1widget:rows/status",
+        "value": "complete"
+      }
+    ],
+    "timestamp": "2025-01-15T10:00:06Z"
+  },
+  { "type": "StepFinished", "runId": "r1", "stepId": "performance", "status": "ok", "timestamp": "2025-01-15T10:00:07Z" },
+
+  { "type": "StepStarted", "runId": "r1", "stepId": "analyst", "agent": "analyst", "timestamp": "2025-01-15T10:00:08Z" },
+  { "type": "TextMessageChunk", "runId": "r1", "stepId": "analyst", "messageId": "m2", "role": "assistant", "delta": "Recommending a nonclustered index on Posts.OwnerUserId." },
+  {
+    "type": "StateDelta",
+    "runId": "r1",
+    "patches": [
+      {
+        "op": "add",
+        "path": "/widgets/run:r1~1step:analyst~1agent:analyst~1widget:diff",
+        "value": {
+          "id": "run:r1/step:analyst/agent:analyst/widget:diff",
+          "type": "ddl-diff",
+          "status": "complete",
+          "title": "Proposed DDL change",
+          "summary": "Add IX_Posts_OwnerUserId",
+          "placement": { "surface": "timeline", "order": 4 },
+          "props": {
+            "before": "-- no index on OwnerUserId",
+            "after": "CREATE NONCLUSTERED INDEX IX_Posts_OwnerUserId ON dbo.Posts(OwnerUserId) INCLUDE (Score, CreationDate);",
+            "language": "sql"
+          }
+        }
+      },
+      {
+        "op": "add",
+        "path": "/widgets/run:r1~1step:analyst~1agent:analyst~1widget:approval",
+        "value": {
+          "id": "run:r1/step:analyst/agent:analyst/widget:approval",
+          "type": "approval-card",
+          "status": "awaiting-input",
+          "title": "Apply DDL change?",
+          "summary": "Awaiting human approval",
+          "placement": { "surface": "timeline", "order": 5 },
+          "props": {
+            "prompt": "Create nonclustered index IX_Posts_OwnerUserId on Posts(OwnerUserId)?",
+            "options": ["approve", "reject"]
+          }
+        }
+      }
+    ],
+    "timestamp": "2025-01-15T10:00:09Z"
+  },
+  {
+    "type": "Custom",
+    "runId": "r1",
+    "name": "input.requested",
+    "payload": { "widgetId": "run:r1/step:analyst/agent:analyst/widget:approval" },
+    "timestamp": "2025-01-15T10:00:10Z"
+  },
+  {
+    "type": "Custom",
+    "runId": "r1",
+    "name": "input.received",
+    "payload": { "widgetId": "run:r1/step:analyst/agent:analyst/widget:approval", "choice": "approve" },
+    "timestamp": "2025-01-15T10:00:11Z"
+  },
+  {
+    "type": "StateDelta",
+    "runId": "r1",
+    "patches": [
+      {
+        "op": "replace",
+        "path": "/widgets/run:r1~1step:analyst~1agent:analyst~1widget:approval/status",
+        "value": "complete"
+      },
+      {
+        "op": "replace",
+        "path": "/widgets/run:r1~1step:analyst~1agent:analyst~1widget:approval/summary",
+        "value": "Approved by user"
+      }
+    ],
+    "timestamp": "2025-01-15T10:00:12Z"
+  },
+  {
+    "type": "StateDelta",
+    "runId": "r1",
+    "patches": [
+      {
+        "op": "add",
+        "path": "/widgets/run:r1~1step:analyst~1agent:analyst~1widget:report",
+        "value": {
+          "id": "run:r1/step:analyst/agent:analyst/widget:report",
+          "type": "markdown-report",
+          "status": "complete",
+          "title": "Tuning report",
+          "summary": "Markdown summary of findings and applied changes",
+          "placement": { "surface": "artifacts", "order": 1 },
+          "props": {
+            "markdown": "# Tuning Report\n\n- Added IX_Posts_OwnerUserId\n- Expected 7x speedup on Posts.OwnerUserId lookups\n"
+          }
+        }
+      },
+      {
+        "op": "add",
+        "path": "/widgets/run:r1~1step:analyst~1agent:analyst~1widget:file",
+        "value": {
+          "id": "run:r1/step:analyst/agent:analyst/widget:file",
+          "type": "file-download",
+          "status": "complete",
+          "title": "tuning-report.md",
+          "summary": "Download generated report",
+          "placement": { "surface": "artifacts", "order": 2 },
+          "props": { "filename": "tuning-report.md", "description": "Generated by analyst agent" },
+          "artifact": { "id": "art_001", "name": "tuning-report.md", "contentType": "text/markdown", "sizeBytes": 1024 }
+        }
+      }
+    ],
+    "timestamp": "2025-01-15T10:00:13Z"
+  },
+  {
+    "type": "Custom",
+    "runId": "r1",
+    "name": "artifact.created",
+    "payload": { "id": "art_001", "name": "tuning-report.md" },
+    "timestamp": "2025-01-15T10:00:14Z"
+  },
+  { "type": "StepFinished", "runId": "r1", "stepId": "analyst", "status": "ok", "timestamp": "2025-01-15T10:00:15Z" },
+
+  { "type": "RunFinished", "runId": "r1", "status": "ok", "timestamp": "2025-01-15T10:00:16Z" }
+]
