@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cloudeng-agent://widgets/markdown-report.schema.json",
+  "title": "markdown-report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["markdown"],
+  "properties": {
+    "markdown": { "type": "string" },
+    "artifactId": { "type": "string", "format": "uuid" }
+  }
+}

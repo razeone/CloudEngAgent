@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cloudeng-agent://widgets/kpi-cards.schema.json",
+  "title": "kpi-cards",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["cards"],
+  "properties": {
+    "cards": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "value"],
+        "properties": {
+          "label": { "type": "string", "minLength": 1 },
+          "value": {},
+          "unit": { "type": "string" },
+          "delta": { "type": "number" },
+          "trend": { "type": "string", "enum": ["up", "down", "flat"] }
+        }
+      }
+    }
+  }
+}

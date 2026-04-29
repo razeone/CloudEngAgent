@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cloudeng-agent://widgets/result-table.schema.json",
+  "title": "result-table",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["columns", "rows", "pageSize", "totalKnown"],
+  "properties": {
+    "columns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "type"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "type": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "pageSize": { "type": "integer", "minimum": 1 },
+    "totalKnown": { "type": "boolean" }
+  }
+}

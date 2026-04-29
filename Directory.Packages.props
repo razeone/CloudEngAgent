@@ -29,6 +29,8 @@
     <PackageVersion Include="Azure.Security.KeyVault.Secrets" Version="4.10.0" />
     <!-- YAML -->
     <PackageVersion Include="YamlDotNet" Version="17.0.1" />
+    <!-- JSON Schema validation (Draft 2020-12) for widget registry -->
+    <PackageVersion Include="JsonSchema.Net" Version="9.2.0" />
     <!-- Transitive pins (vulnerability mitigations) -->
     <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.7" />
     <!-- ASP.NET Core / Hosting -->

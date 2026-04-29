@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cloudeng-agent://widgets/file-download.schema.json",
+  "title": "file-download",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["artifactId", "filename", "contentType", "sizeBytes"],
+  "properties": {
+    "artifactId": { "type": "string", "format": "uuid" },
+    "filename": { "type": "string", "minLength": 1 },
+    "contentType": { "type": "string", "minLength": 1 },
+    "sizeBytes": { "type": "integer", "minimum": 0 }
+  }
+}

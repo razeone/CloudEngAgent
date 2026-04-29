@@ -3,6 +3,7 @@ using CloudEngAgent.Application.Abstractions;
 using CloudEngAgent.Domain.Backends;
 using CloudEngAgent.Domain.Personas;
 using CloudEngAgent.Domain.Tools;
+using CloudEngAgent.Domain.Widgets;
 
 namespace CloudEngAgent.Infrastructure.Personas;
 
@@ -11,7 +12,7 @@ namespace CloudEngAgent.Infrastructure.Personas;
 /// DBA personas hard-coded for the API milestone. A YAML-backed implementation
 /// with hot reload replaces this in a later plan.
 /// </summary>
-public sealed class InMemoryPersonaRepository : IPersonaRepository
+public sealed class InMemoryPersonaRepository : IPersonaRepository, IPersonaWidgetPolicy
 {
     private readonly Dictionary<string, AgentPersona> _personas;
 
@@ -38,6 +39,13 @@ public sealed class InMemoryPersonaRepository : IPersonaRepository
             yield return persona;
             await Task.Yield();
         }
+    }
+
+    /// <summary>No restrictions in the seed repository — every persona may emit any widget.</summary>
+    public IReadOnlyList<WidgetType>? GetAllowedWidgets(string personaId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(personaId);
+        return null;
     }
 
     internal static IEnumerable<AgentPersona> SeedPersonas()

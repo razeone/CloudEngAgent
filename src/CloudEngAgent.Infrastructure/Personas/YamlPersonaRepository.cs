@@ -6,6 +6,7 @@ using CloudEngAgent.Application.Abstractions;
 using CloudEngAgent.Domain.Backends;
 using CloudEngAgent.Domain.Personas;
 using CloudEngAgent.Domain.Tools;
+using CloudEngAgent.Domain.Widgets;
 using Microsoft.Extensions.Logging;
 using YamlDotNet.Core;
 using YamlDotNet.Serialization;
@@ -19,7 +20,7 @@ namespace CloudEngAgent.Infrastructure.Personas;
 /// must match the persona's <c>id</c> field. Hot reload raises
 /// <see cref="PersonaChanged"/> for adds, updates, and removals.
 /// </summary>
-public sealed class YamlPersonaRepository : IPersonaRepository, IDisposable
+public sealed class YamlPersonaRepository : IPersonaRepository, IPersonaWidgetPolicy, IDisposable
 {
     private static readonly TimeSpan DebounceWindow = TimeSpan.FromMilliseconds(500);
 
@@ -30,6 +31,8 @@ public sealed class YamlPersonaRepository : IPersonaRepository, IDisposable
     private readonly Timer _debounceTimer;
     private IReadOnlyDictionary<string, AgentPersona> _snapshot =
         new Dictionary<string, AgentPersona>(StringComparer.Ordinal);
+    private IReadOnlyDictionary<string, IReadOnlyList<WidgetType>> _allowedWidgets =
+        new Dictionary<string, IReadOnlyList<WidgetType>>(StringComparer.Ordinal);
 
     public YamlPersonaRepository(string directory, ILogger<YamlPersonaRepository> logger, bool watch = true)
     {
@@ -122,9 +125,10 @@ public sealed class YamlPersonaRepository : IPersonaRepository, IDisposable
         lock (_reloadLock)
         {
             var previous = _snapshot;
-            var next = LoadAll(_directory);
+            var (next, nextAllowed) = LoadAllInternal(_directory);
 
             Volatile.Write(ref _snapshot, next);
+            Volatile.Write(ref _allowedWidgets, nextAllowed);
 
             if (initial)
             {
@@ -169,13 +173,26 @@ public sealed class YamlPersonaRepository : IPersonaRepository, IDisposable
     }
 
     internal static IReadOnlyDictionary<string, AgentPersona> LoadAll(string directory)
+        => LoadAllInternal(directory).Personas;
+
+    public IReadOnlyList<WidgetType>? GetAllowedWidgets(string personaId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(personaId);
+        var allowed = Volatile.Read(ref _allowedWidgets);
+        return allowed.TryGetValue(personaId, out var list) ? list : null;
+    }
+
+    internal static (IReadOnlyDictionary<string, AgentPersona> Personas,
+        IReadOnlyDictionary<string, IReadOnlyList<WidgetType>> AllowedWidgets)
+        LoadAllInternal(string directory)
     {
         var deserializer = new DeserializerBuilder()
             .WithNamingConvention(CamelCaseNamingConvention.Instance)
             .IgnoreUnmatchedProperties()
             .Build();
 
-        var result = new Dictionary<string, AgentPersona>(StringComparer.Ordinal);
+        var personas = new Dictionary<string, AgentPersona>(StringComparer.Ordinal);
+        var allowed = new Dictionary<string, IReadOnlyList<WidgetType>>(StringComparer.Ordinal);
         var files = Directory.EnumerateFiles(directory, "*.yaml", SearchOption.TopDirectoryOnly)
             .OrderBy(p => p, StringComparer.Ordinal);
 
@@ -211,14 +228,34 @@ public sealed class YamlPersonaRepository : IPersonaRepository, IDisposable
             }
 
             var persona = MapPersona(doc, path, content);
-            if (!result.TryAdd(persona.Id, persona))
+            if (!personas.TryAdd(persona.Id, persona))
             {
                 throw new InvalidOperationException(
                     $"Duplicate persona id '{persona.Id}' (file '{Path.GetFileName(path)}').");
             }
+
+            if (doc.AllowedWidgets is { Count: > 0 } widgetIds)
+            {
+                var parsed = new List<WidgetType>(widgetIds.Count);
+                foreach (var raw in widgetIds)
+                {
+                    try
+                    {
+                        parsed.Add(WidgetType.Parse(raw));
+                    }
+                    catch (ArgumentException ex)
+                    {
+                        throw new InvalidOperationException(
+                            $"Persona '{persona.Id}' allowedWidgets contains an unknown widget type: {ex.Message}",
+                            ex);
+                    }
+                }
+
+                allowed[persona.Id] = parsed;
+            }
         }
 
-        return result;
+        return (personas, allowed);
     }
 
     private static AgentPersona MapPersona(PersonaYamlDocument doc, string path, string rawContent)

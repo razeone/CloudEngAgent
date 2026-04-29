@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cloudeng-agent://widgets/bar-chart.schema.json",
+  "title": "bar-chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "xLabel", "yLabel", "series"],
+  "properties": {
+    "title": { "type": "string", "minLength": 1 },
+    "xLabel": { "type": "string" },
+    "yLabel": { "type": "string" },
+    "series": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "points"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["x", "y"],
+              "properties": {
+                "x": {},
+                "y": { "type": "number" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

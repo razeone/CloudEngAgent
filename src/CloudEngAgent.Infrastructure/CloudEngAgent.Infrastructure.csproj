@@ -18,6 +18,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Widgets\Schemas\*.schema.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
       <_Parameter1>CloudEngAgent.Infrastructure.Tests</_Parameter1>
     </AssemblyAttribute>
@@ -62,6 +66,9 @@
 
     <!-- YAML -->
     <PackageReference Include="YamlDotNet" />
+
+    <!-- JSON Schema validation (widget registry) -->
+    <PackageReference Include="JsonSchema.Net" />
 
     <!-- DI + Config abstractions for AddInfrastructure -->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />

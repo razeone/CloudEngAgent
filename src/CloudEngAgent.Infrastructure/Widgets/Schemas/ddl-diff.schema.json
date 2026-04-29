@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cloudeng-agent://widgets/ddl-diff.schema.json",
+  "title": "ddl-diff",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["before", "after", "language"],
+  "properties": {
+    "before": { "type": "string" },
+    "after": { "type": "string" },
+    "language": { "type": "string", "enum": ["tsql"] }
+  }
+}

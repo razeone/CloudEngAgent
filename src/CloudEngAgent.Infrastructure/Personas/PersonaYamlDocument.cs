@@ -11,6 +11,7 @@ internal sealed class PersonaYamlDocument
     public string? SystemPrompt { get; set; }
     public string? Backend { get; set; }
     public List<string>? Tools { get; set; }
+    public List<string>? AllowedWidgets { get; set; }
     public PersonaYamlGuardrails? Guardrails { get; set; }
 }
 

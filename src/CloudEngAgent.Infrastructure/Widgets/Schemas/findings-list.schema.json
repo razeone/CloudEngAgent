@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cloudeng-agent://widgets/findings-list.schema.json",
+  "title": "findings-list",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["findings"],
+  "properties": {
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["id", "severity", "title", "description", "remediation"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "severity": {
+            "type": "string",
+            "enum": ["Critical", "High", "Medium", "Low", "Info"]
+          },
+          "title": { "type": "string", "minLength": 1 },
+          "description": { "type": "string" },
+          "remediation": { "type": "string" },
+          "refs": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
