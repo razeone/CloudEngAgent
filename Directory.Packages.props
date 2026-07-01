@@ -28,7 +28,7 @@
     <PackageVersion Include="Azure.Identity" Version="1.21.0" />
     <PackageVersion Include="Azure.Security.KeyVault.Secrets" Version="4.10.0" />
     <!-- YAML -->
-    <PackageVersion Include="YamlDotNet" Version="17.0.1" />
+    <PackageVersion Include="YamlDotNet" Version="18.1.0" />
     <!-- Transitive pins (vulnerability mitigations) -->
     <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.7" />
     <!-- ASP.NET Core / Hosting -->
